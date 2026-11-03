@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy import stats as scipy_stats
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IPROGNOSIS_ROOT = (
@@ -50,15 +51,24 @@ def parse_event_line(line: str) -> tuple[int, int, float]:
     return press_ms, release_ms, pressure
 
 
+def _finite_or_zero(value: float) -> float:
+    """Return a finite float; undefined shape statistics (e.g. constant data) become 0."""
+    value = float(value)
+    return value if np.isfinite(value) else 0.0
+
+
 def _summaries(values: list[float], prefix: str) -> dict[str, float]:
-    """Summarize one measurement series with scale and spread statistics."""
+    """Summarize one measurement series with scale, spread and shape statistics."""
     if not values:
         return {}
     array = np.asarray(values, dtype=float)
     # Quantiles make the summaries less sensitive to unusually long timings.
     mean = float(array.mean())
-    q25, median, q75, q90 = (float(v) for v in np.quantile(array, [0.25, 0.5, 0.75, 0.9]))
+    q10, q25, median, q75, q90 = (
+        float(v) for v in np.quantile(array, [0.1, 0.25, 0.5, 0.75, 0.9])
+    )
     std = float(array.std(ddof=0))
+    has_spread = array.size >= 3 and std > 0
     return {
         f"{prefix}_mean": mean,
         f"{prefix}_std": std,
@@ -66,7 +76,19 @@ def _summaries(values: list[float], prefix: str) -> dict[str, float]:
         f"{prefix}_q90": q90,
         f"{prefix}_iqr": q75 - q25,
         f"{prefix}_cv": std / mean if mean > 0 else 0.0,
+        f"{prefix}_q10": q10,
+        f"{prefix}_skew": _finite_or_zero(scipy_stats.skew(array)) if has_spread else 0.0,
+        f"{prefix}_kurtosis": _finite_or_zero(scipy_stats.kurtosis(array)) if has_spread else 0.0,
     }
+
+def _lag1_autocorrelation(values: list[float]) -> float:
+    """Return lag-1 autocorrelation, or 0.0 when it is undefined."""
+    array = np.asarray(values, dtype=float)
+    if array.size < 4 or array.std() == 0:
+        return 0.0
+    centred = array - array.mean()
+    denominator = float(np.sum(centred ** 2))
+    return _finite_or_zero(np.sum(centred[:-1] * centred[1:]) / denominator)
 
 
 # Excerpt-level feature extraction
@@ -135,6 +157,8 @@ def extract_excerpt_features(path: Path, *, pause_threshold_ms: int = 1000) -> t
     features.update(_summaries(pressures, "pressure_normalized"))
     n_valid_gaps = len(interkey_gaps)
     features["pause_fraction"] = len(pauses) / n_valid_gaps if n_valid_gaps else 0.0
+    features["press_interval_ms_acf1"] = _lag1_autocorrelation(press_intervals)
+    features["hold_ms_acf1"] = _lag1_autocorrelation(holds)
     # Keep counts of excluded or unusual records separate from predictor values.
     audit = {
         "nonblank_lines": len(events) + malformed_lines + invalid_events,
@@ -150,6 +174,16 @@ def extract_excerpt_features(path: Path, *, pause_threshold_ms: int = 1000) -> t
 
 
 # Participant linkage and aggregation
+TREND_SOURCE_COLUMNS = ["hold_ms_median", "press_interval_ms_median", "pause_fraction"]
+
+
+def _slope(x: np.ndarray, y: np.ndarray) -> float:
+    """Least-squares slope of y against x; 0.0 if fewer than three usable points."""
+    keep = np.isfinite(x) & np.isfinite(y)
+    if keep.sum() < 3 or np.unique(x[keep]).size < 2:
+        return 0.0
+    return _finite_or_zero(np.polyfit(x[keep], y[keep], 1)[0])
+
 def build_participant_dataset(
     iprognosis_root: Path = DEFAULT_IPROGNOSIS_ROOT,
     *,
@@ -230,6 +264,15 @@ def build_participant_dataset(
         if column not in {"participant_id", "excerpt_id", "target", "event_count_audit_only"}
     ]
     participants = excerpts.groupby(["participant_id", "target"], as_index=False)[feature_columns].median()
+    # Each participant's slope uses only that participant's own excerpts, so these
+    # features cannot leak information between participants.
+    trend_rows = []
+    for participant_id, frame in excerpts.groupby("participant_id"):
+        row = {"participant_id": participant_id}
+        for column in TREND_SOURCE_COLUMNS:
+            row[f"{column}_trend"] = _slope(frame["excerpt_id"].to_numpy(float), frame[column].to_numpy(float))
+        trend_rows.append(row)
+    participants = participants.merge(pd.DataFrame(trend_rows), on="participant_id", validate="one_to_one")
     counts = excerpts.groupby("participant_id").agg(
         excerpt_count=("excerpt_id", "size"), total_valid_events=("event_count_audit_only", "sum")
     ).reset_index()
@@ -242,7 +285,7 @@ def build_participant_dataset(
         "event_schema": ["Press", "press timestamp milliseconds", "Release timestamp milliseconds", "normalized pressure 0-1"],
         "timestamp_unit": "milliseconds, as documented in local ReadMe.txt",
         "pressure_summary_policy": "Only observed values in documented [0,1] range enter pressure features; all values are retained in audit counts, no clipping",
-        "aggregation": "median of excerpt-level feature summaries per participant; event and excerpt counts are audit-only",
+        "aggregation": "median of excerpt-level feature summaries per participant, plus per-participant slope of selected excerpt medians across excerpts (*_trend); event and excerpt counts are audit-only",
         "participants": int(len(participants)),
         "participants_by_label": {"control": int((participants.target == 0).sum()), "pd": int((participants.target == 1).sum())},
         "excerpt_files": int(len(excerpts)),

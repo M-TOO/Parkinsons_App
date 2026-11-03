@@ -38,6 +38,7 @@ docs/
   ARCHITECTURE.md
   ML_WORKFLOW.md
   CODEBASE_WALKTHROUGH.md
+  PRESENTATION_SCRIPT.md
   REPOSITORY_AUDIT.md
   LEARNING_GUIDE.md
 models/                            fitted active models and preserved historical artifacts

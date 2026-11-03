@@ -9,6 +9,9 @@
       "cwd": "${workspaceFolder}",
       "python": "${workspaceFolder}/.venv/Scripts/python.exe",
       "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
       "args": [
         "--model-path",
         "models/finalization_baseline/drawing_image_model.joblib",
@@ -28,6 +31,9 @@
       "cwd": "${workspaceFolder}",
       "python": "${workspaceFolder}/.venv/Scripts/python.exe",
       "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
       "args": [
         "--model-path",
         "models/finalization_baseline/typing_iprognosis_model.joblib",
