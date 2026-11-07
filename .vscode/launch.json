@@ -42,6 +42,18 @@
         "--seed",
         "42"
       ]
+    },
+    {
+      "name": "Python: Run ML Service",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "backend.ml_service",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "console": "integratedTerminal",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
     }
   ]
 }
