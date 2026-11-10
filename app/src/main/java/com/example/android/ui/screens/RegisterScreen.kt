@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.android.data.api.ApiClient
 import com.example.android.data.repository.AssessmentRepository
 import com.example.android.ui.theme.*
 import kotlinx.coroutines.launch
@@ -209,6 +210,8 @@ fun RegisterScreen(
                                         val result = repository.register(fullName.trim(), email.trim(), password, yob)
                                         isLoading = false
                                         result.onSuccess {
+                                            // Explicitly clear token so new user must log in
+                                            ApiClient.clearToken()
                                             onRegisterSuccess(fullName, email)
                                         }.onFailure { err ->
                                             errorMessage = err.localizedMessage ?: "Registration failed"

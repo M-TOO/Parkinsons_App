@@ -13,7 +13,10 @@ object ApiClient {
     private var token: String? = null
 
     fun setToken(newToken: String) { token = newToken }
-    fun clearToken() { token = null }
+    fun clearToken() {
+        token = null
+        com.example.android.data.model.SessionState.startNewSession()
+    }
     fun getToken(): String? = token
 
     private val client by lazy {

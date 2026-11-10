@@ -278,7 +278,37 @@ fun AdminDashboardScreen(navController: NavController) {
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(patients) { patient ->
-                                    PatientRosterCard(patient = patient)
+                                    PatientRosterCard(
+                                        patient = patient,
+                                        onReviewClick = {
+                                            val matchedSession = flaggedSessions.firstOrNull { it.patient_id == patient.id }
+                                            if (matchedSession != null) {
+                                                reviewingSession = matchedSession
+                                                clinicalNotesText = matchedSession.clinical_notes ?: ""
+                                                selectedReviewStatus = matchedSession.review_status
+                                            } else {
+                                                // Create reviewable target for latest patient screening
+                                                reviewingSession = FlaggedSession(
+                                                    session_id = "",
+                                                    patient_id = patient.id,
+                                                    patient_name = patient.full_name,
+                                                    patient_email = patient.email,
+                                                    patient_birth_year = patient.year_of_birth,
+                                                    overall_stability_score = patient.latest_score,
+                                                    risk_label = patient.latest_risk_label ?: "Screened",
+                                                    drawing_tremor_level = "Standard",
+                                                    drawing_status = "Complete",
+                                                    tapping_status = "Evaluated",
+                                                    review_status = "Pending Review",
+                                                    clinical_notes = null,
+                                                    reviewed_by = null,
+                                                    created_at = patient.latest_screening_date ?: ""
+                                                )
+                                                clinicalNotesText = ""
+                                                selectedReviewStatus = "Follow-up Required"
+                                            }
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -502,47 +532,66 @@ fun FlaggedSessionCard(
 }
 
 @Composable
-fun PatientRosterCard(patient: PatientSummary) {
+fun PatientRosterCard(
+    patient: PatientSummary,
+    onReviewClick: () -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = MedicalSurface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(patient.full_name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(
-                    text = "${patient.email} • Born ${patient.year_of_birth}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Total Screenings: ${patient.total_assessments} • Last: ${patient.latest_screening_date ?: "No tests yet"}",
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
-            }
-
-            if (patient.latest_score != null) {
-                Column(horizontalAlignment = Alignment.End) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(patient.full_name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Text(
-                        text = "${patient.latest_score.toInt()}/100",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = if (patient.latest_score >= 70) StatusSteady else StatusAtypical
-                    )
-                    Text(
-                        text = patient.latest_risk_label ?: "STABLE",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        text = "${patient.email} • Born ${patient.year_of_birth}",
+                        style = MaterialTheme.typography.labelSmall,
                         color = TextMuted
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Total Screenings: ${patient.total_assessments} • Last: ${patient.latest_screening_date ?: "No tests yet"}",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                }
+
+                if (patient.latest_score != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "${patient.latest_score.toInt()}/100",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = if (patient.latest_score >= 70) StatusSteady else StatusAtypical
+                        )
+                        Text(
+                            text = patient.latest_risk_label ?: "STABLE",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextMuted
+                        )
+                    }
+                }
+            }
+
+            if (patient.total_assessments > 0) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = onReviewClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MedicalPrimary)
+                ) {
+                    Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Neurologist Notes & Review", fontSize = 13.sp)
                 }
             }
         }

@@ -86,10 +86,28 @@ data class ClinicalReviewRequest(
     val override_risk_label: String? = null
 )
 
+data class DetailedScreeningReview(
+    val sessionId: String = "",
+    val date: String = "",
+    val overallScore: Int = 88,
+    val riskLabel: String = "Stable",
+    val spiralTremorLevel: String = "Low Tremor",
+    val spiralStatus: String = "Fluid",
+    val waveTremorLevel: String = "Low Tremor",
+    val waveStatus: String = "Fluid",
+    val tappingStabilityMatch: Float = 92.0f,
+    val tappingStatus: String = "Steady",
+    val clinicalNotes: String? = null,
+    val reviewedBy: String? = null
+)
+
 object SessionState {
     var currentSessionId: String = java.util.UUID.randomUUID().toString()
+    var selectedSessionForReview: DetailedScreeningReview? = null
+
     fun startNewSession(): String {
         currentSessionId = java.util.UUID.randomUUID().toString()
+        selectedSessionForReview = null
         return currentSessionId
     }
 }

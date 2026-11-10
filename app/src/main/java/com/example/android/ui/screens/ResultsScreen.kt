@@ -1,5 +1,6 @@
 package com.example.android.ui.screens
 
+import android.content.Intent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,10 @@ data class AssessmentResult(
     val waveStatus: String = "Fluid",
     val tappingStabilityMatch: Float = 92.0f,
     val tappingStatus: String = "Steady",
+    val clinicalNotes: String? = null,
+    val reviewedBy: String? = null,
+    val screeningDate: String = "",
+    val sessionId: String = "",
     val modulesCompleted: Int = 3
 )
 
@@ -41,9 +47,9 @@ data class AssessmentResult(
 @Composable
 fun ResultsScreen(
     navController: NavController,
-    result: AssessmentResult = AssessmentResult() // Default demo values
+    result: AssessmentResult = AssessmentResult()
 ) {
-    // Animate the donut chart drawing in from 0 to the final score
+    val context = LocalContext.current
     val animatedProgress = remember { Animatable(0f) }
     LaunchedEffect(result.overallScore) {
         animatedProgress.animateTo(
@@ -52,16 +58,27 @@ fun ResultsScreen(
         )
     }
 
-    val riskColor = when (result.riskLabel) {
-        "Stable" -> StatusSteady
-        "Review Suggested" -> StatusAtypical
+    val riskColor = when (result.riskLabel.uppercase()) {
+        "STABLE", "NO FLAGS" -> StatusSteady
+        "REVIEW SUGGESTED", "ATYPICAL", "ATYPICAL PATTERN" -> StatusAtypical
         else -> StatusReview
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Movement Report", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("Movement Report", fontWeight = FontWeight.Bold)
+                        if (result.screeningDate.isNotBlank()) {
+                            Text(
+                                text = "Screened on ${result.screeningDate}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -81,7 +98,7 @@ fun ResultsScreen(
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // 1. Overall Stability Donut Score Card
+            // 1. Overall Composite Score Hero Card with Donut Chart
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -92,34 +109,34 @@ fun ResultsScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Composite Motor & Clinics Risk",
+                            text = "Composite Motor & Clinical Risk",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "${result.modulesCompleted} Modules Assessed",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMuted
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // Animated Donut Chart
+                        // Animated Donut Score Chart
                         DonutScoreChart(
                             progress = animatedProgress.value,
-                            score = (animatedProgress.value * 100).toInt(),
-                            primaryColor = MedicalPrimary,
+                            score = result.overallScore,
+                            primaryColor = riskColor,
                             trackColor = MedicalSurfaceVariant,
                             size = 150.dp
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                        // Risk Label Badge
+                        // Clinical Risk Badge
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = riskColor.copy(alpha = 0.15f)
@@ -127,16 +144,62 @@ fun ResultsScreen(
                             Text(
                                 text = "Risk Status: ${result.riskLabel.uppercase()}",
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = riskColor
+                                style = MaterialTheme.typography.labelMedium,
+                                color = riskColor,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
             }
 
-            // 2. Biomarker Modality Breakdown Section Header
+            // 2. Attending Neurologist Clinical Notes (if available)
+            if (!result.clinicalNotes.isNullOrBlank()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MedicalSurface),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, MedicalPrimary)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = MedicalPrimary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Neurologist Clinical Review",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MedicalPrimary,
+                                    fontSize = 15.sp
+                                )
+                            }
+                            if (!result.reviewedBy.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Attending Physician: ${result.reviewedBy}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextMuted
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MedicalSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "\"${result.clinicalNotes}\"",
+                                    fontSize = 13.sp,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Modality Breakdown Section Header
             item {
                 Text(
                     text = "Biomarker Modality Breakdown",
@@ -145,7 +208,7 @@ fun ResultsScreen(
                 )
             }
 
-            // 3. Spiral Drawing Row
+            // 4. Test 1: Spiral Drawing
             item {
                 MetricRow(
                     icon = Icons.Default.Gesture,
@@ -156,7 +219,7 @@ fun ResultsScreen(
                 )
             }
 
-            // 4. Wave Drawing Row
+            // 5. Test 2: Wave Drawing
             item {
                 MetricRow(
                     icon = Icons.Default.Gesture,
@@ -167,7 +230,7 @@ fun ResultsScreen(
                 )
             }
 
-            // 5. Typing Dynamics Row
+            // 6. Test 3: Typing Dynamics
             item {
                 MetricRow(
                     icon = Icons.Default.Keyboard,
@@ -178,19 +241,19 @@ fun ResultsScreen(
                 )
             }
 
-            // 6. Medical Disclaimer
+            // 7. Clinical Disclaimer Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = StatusAtypical.copy(alpha = 0.08f))
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFECEB))
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.Top
                     ) {
                         Icon(
-                            Icons.Default.Warning,
+                            imageVector = Icons.Default.Warning,
                             contentDescription = null,
                             tint = StatusAtypical,
                             modifier = Modifier.size(18.dp)
@@ -205,7 +268,7 @@ fun ResultsScreen(
                 }
             }
 
-            // 7. Recommended Next Steps Card
+            // 8. Recommended Next Steps Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -234,7 +297,62 @@ fun ResultsScreen(
                 }
             }
 
-            // 8. Done Button
+            // 9. Download / Share Clinical Report Button
+            item {
+                OutlinedButton(
+                    onClick = {
+                        val reportText = buildString {
+                            appendLine("==================================================")
+                            appendLine("   NEUROSCREEN - DIGITAL MOTOR BIOMARKER REPORT   ")
+                            appendLine("==================================================")
+                            if (result.screeningDate.isNotBlank()) {
+                                appendLine("Screening Date: ${result.screeningDate}")
+                            }
+                            if (result.sessionId.isNotBlank()) {
+                                appendLine("Session ID: ${result.sessionId}")
+                            }
+                            appendLine("Overall Stability Score: ${result.overallScore} / 100")
+                            appendLine("Clinical Risk Classification: ${result.riskLabel.uppercase()}")
+                            appendLine()
+                            appendLine("MODALITY BREAKDOWN:")
+                            appendLine("• Spiral Drawing: ${result.spiralStatus} (${result.spiralTremorLevel})")
+                            appendLine("• Wave Drawing:   ${result.waveStatus} (${result.waveTremorLevel})")
+                            appendLine("• Typing Rhythm:  ${result.tappingStatus} (${result.tappingStabilityMatch}% stability)")
+                            appendLine()
+                            if (!result.clinicalNotes.isNullOrBlank()) {
+                                appendLine("NEUROLOGIST CLINICAL REVIEW:")
+                                if (!result.reviewedBy.isNullOrBlank()) {
+                                    appendLine("Attending: ${result.reviewedBy}")
+                                }
+                                appendLine("Clinical Notes: \"${result.clinicalNotes}\"")
+                                appendLine()
+                            }
+                            appendLine("DISCLAIMER:")
+                            appendLine("This digital biomarker screening is an adjunctive clinical evaluation tool and does not constitute a standalone medical diagnosis.")
+                            appendLine("==================================================")
+                        }
+
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TITLE, "NeuroScreen Clinical Motor Report")
+                            putExtra(Intent.EXTRA_SUBJECT, "NeuroScreen Motor Assessment Report")
+                            putExtra(Intent.EXTRA_TEXT, reportText)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, "Download / Share Clinical Report"))
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, tint = MedicalPrimary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Download & Share Clinical Report", fontWeight = FontWeight.Bold, color = MedicalPrimary)
+                }
+            }
+
+            // 10. Home Button
             item {
                 Button(
                     onClick = {

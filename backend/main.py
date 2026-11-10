@@ -227,7 +227,8 @@ def get_admin_stats(
     total_patients = db.query(User).filter_by(role="patient").count()
     total_assessments = db.query(AssessmentSession).count()
     flagged = db.query(AssessmentSession).filter(
-        AssessmentSession.risk_label.in_(["Review suggested", "Atypical pattern", "ATYPICAL"])
+        (AssessmentSession.risk_label.in_(["Review suggested", "Atypical pattern", "ATYPICAL", "MONITOR", "Inconclusive"])) |
+        (AssessmentSession.overall_stability_score < 80)
     ).count()
     pending = db.query(AssessmentSession).filter_by(review_status="Pending Review").count()
 
@@ -290,10 +291,14 @@ def list_flagged_sessions(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """Priority triage queue: returns all flagged/atypical assessments requiring clinical review."""
+    """Priority triage queue: returns all flagged/atypical/monitor assessments requiring clinical review."""
     flagged = (
         db.query(AssessmentSession)
-        .filter(AssessmentSession.risk_label.in_(["Review suggested", "Atypical pattern", "ATYPICAL"]))
+        .filter(
+            (AssessmentSession.risk_label.in_(["Review suggested", "Atypical pattern", "ATYPICAL", "MONITOR", "Inconclusive"])) |
+            (AssessmentSession.overall_stability_score < 80) |
+            (AssessmentSession.review_status == "Pending Review")
+        )
         .order_by(AssessmentSession.created_at.desc())
         .all()
     )

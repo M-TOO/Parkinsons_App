@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,12 +18,55 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.android.data.model.DetailedScreeningReview
+import com.example.android.data.model.SessionState
+import com.example.android.data.repository.AssessmentRepository
 import com.example.android.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
     var showMenu by remember { mutableStateOf(false) }
+    val repository = remember { AssessmentRepository() }
+    var latestSessionReview by remember { mutableStateOf<DetailedScreeningReview?>(null) }
+    var hasPastSessions by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val result = repository.getSessions()
+        result.onSuccess { list ->
+            if (list.isNotEmpty()) {
+                val latest = list.first()
+                val cleanDate = try {
+                    latest.created_at.replace("T", " ").take(16)
+                } catch (e: Exception) {
+                    latest.created_at
+                }
+                val label = when (latest.risk_label) {
+                    "No flags", "Typical pattern" -> "STABLE"
+                    "Inconclusive" -> "MONITOR"
+                    "Review suggested", "Atypical pattern" -> "ATYPICAL"
+                    else -> latest.risk_label ?: "STABLE"
+                }
+                latestSessionReview = DetailedScreeningReview(
+                    sessionId = latest.session_id,
+                    date = cleanDate,
+                    overallScore = latest.overall_stability_score?.toInt() ?: 80,
+                    riskLabel = label,
+                    spiralTremorLevel = latest.drawing_tremor_level ?: "Low Tremor",
+                    spiralStatus = latest.drawing_status ?: "Fluid",
+                    waveTremorLevel = latest.drawing_tremor_level ?: "Low Tremor",
+                    waveStatus = latest.drawing_status ?: "Fluid",
+                    tappingStabilityMatch = latest.overall_stability_score?.toFloat() ?: 80f,
+                    tappingStatus = latest.tapping_status ?: "Steady",
+                    clinicalNotes = latest.clinical_notes,
+                    reviewedBy = latest.reviewed_by
+                )
+                hasPastSessions = true
+            } else {
+                hasPastSessions = false
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -55,14 +99,6 @@ fun HomeScreen(navController: NavController) {
                             onClick = {
                                 showMenu = false
                                 navController.navigate("history")
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Clinician Mode (Admin)") },
-                            leadingIcon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
-                            onClick = {
-                                showMenu = false
-                                navController.navigate("admin_dashboard")
                             }
                         )
                         HorizontalDivider()
@@ -115,7 +151,10 @@ fun HomeScreen(navController: NavController) {
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
-                            onClick = { navController.navigate("drawing_spiral") },
+                            onClick = {
+                                SessionState.startNewSession()
+                                navController.navigate("drawing_spiral")
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.White,
                                 contentColor = MedicalPrimary
@@ -124,21 +163,27 @@ fun HomeScreen(navController: NavController) {
                         ) {
                             Text("Start Test Sequence", fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Icon(Icons.Default.ArrowForward, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                         }
                     }
                 }
             }
 
-            item {
-                OutlinedButton(
-                    onClick = { navController.navigate("results") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Assessment, contentDescription = null, tint = MedicalPrimary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("View Sample Movement Report", color = MedicalPrimary)
+            // Latest / Past Screening Movement Report Card
+            if (hasPastSessions && latestSessionReview != null) {
+                item {
+                    OutlinedButton(
+                        onClick = {
+                            SessionState.selectedSessionForReview = latestSessionReview
+                            navController.navigate("results")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Assessment, contentDescription = null, tint = MedicalPrimary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("View Latest Movement Report (${latestSessionReview!!.date})", color = MedicalPrimary, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 
@@ -157,7 +202,10 @@ fun HomeScreen(navController: NavController) {
                     description = "Draw an Archimedean spiral on a 1:1 square canvas. Evaluated by the Drawing Vision Model.",
                     icon = Icons.Default.Gesture,
                     badgeText = "Vision Model (32x32)",
-                    onClick = { navController.navigate("drawing_spiral") }
+                    onClick = {
+                        SessionState.startNewSession()
+                        navController.navigate("drawing_spiral")
+                    }
                 )
             }
 
@@ -168,7 +216,10 @@ fun HomeScreen(navController: NavController) {
                     description = "Draw a sinusoidal wave pattern across a square canvas to evaluate kinematic tremor.",
                     icon = Icons.Default.Gesture,
                     badgeText = "Vision Model (32x32)",
-                    onClick = { navController.navigate("drawing_wave") }
+                    onClick = {
+                        SessionState.startNewSession()
+                        navController.navigate("drawing_wave")
+                    }
                 )
             }
 
@@ -179,7 +230,10 @@ fun HomeScreen(navController: NavController) {
                     description = "Collect 5 text excerpts capturing millisecond press/release times and touch pressure.",
                     icon = Icons.Default.Keyboard,
                     badgeText = "iPrognosis Spec (5 Excerpts)",
-                    onClick = { navController.navigate("typing_test") }
+                    onClick = {
+                        SessionState.startNewSession()
+                        navController.navigate("typing_test")
+                    }
                 )
             }
 

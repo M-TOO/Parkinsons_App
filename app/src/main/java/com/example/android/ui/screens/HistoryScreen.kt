@@ -1,5 +1,6 @@
 package com.example.android.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,22 +17,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.android.data.model.DetailedScreeningReview
+import com.example.android.data.model.SessionState
 import com.example.android.data.repository.AssessmentRepository
 import com.example.android.ui.theme.*
 
 // ── Data model for a past session ──────────────────────────────────────────
 data class SessionHistory(
+    val sessionId: String = "",
     val date: String,
     val score: Int,
     val riskLabel: String,       // "STABLE" | "MONITOR" | "ATYPICAL"
     val spiralResult: String,
     val waveResult: String,
-    val typingResult: String
+    val typingResult: String,
+    val clinicalNotes: String? = null,
+    val reviewedBy: String? = null
 )
 
 // ── Demo fallback data (shown when new account has 0 tests yet) ────────────
 private val fallbackHistory = listOf(
-    SessionHistory("Sample Screening", 88, "STABLE", "Fluid", "Fluid", "Steady")
+    SessionHistory(
+        sessionId = "sample-1",
+        date = "Sample Screening",
+        score = 88,
+        riskLabel = "STABLE",
+        spiralResult = "Fluid",
+        waveResult = "Fluid",
+        typingResult = "Steady"
+    )
 )
 
 // ── Main Screen ────────────────────────────────────────────────────────────
@@ -61,12 +75,15 @@ fun HistoryScreen(navController: NavController) {
                         else -> s.risk_label ?: "STABLE"
                     }
                     SessionHistory(
+                        sessionId = s.session_id,
                         date = cleanDate,
                         score = s.overall_stability_score?.toInt() ?: 80,
                         riskLabel = label,
                         spiralResult = s.drawing_status ?: "Fluid",
                         waveResult = s.drawing_tremor_level ?: "Low",
-                        typingResult = s.tapping_status ?: "Steady"
+                        typingResult = s.tapping_status ?: "Steady",
+                        clinicalNotes = s.clinical_notes,
+                        reviewedBy = s.reviewed_by
                     )
                 }
             } else {
@@ -190,7 +207,26 @@ fun HistoryScreen(navController: NavController) {
                             }
                         }
                         items(sessions) { session ->
-                            SessionHistoryCard(session)
+                            SessionHistoryCard(
+                                session = session,
+                                onClick = {
+                                    SessionState.selectedSessionForReview = DetailedScreeningReview(
+                                        sessionId = session.sessionId,
+                                        date = session.date,
+                                        overallScore = session.score,
+                                        riskLabel = session.riskLabel,
+                                        spiralTremorLevel = session.spiralResult,
+                                        spiralStatus = session.spiralResult,
+                                        waveTremorLevel = session.waveResult,
+                                        waveStatus = session.waveResult,
+                                        tappingStabilityMatch = session.score.toFloat(),
+                                        tappingStatus = session.typingResult,
+                                        clinicalNotes = session.clinicalNotes,
+                                        reviewedBy = session.reviewedBy
+                                    )
+                                    navController.navigate("results")
+                                }
+                            )
                         }
                     }
                 }
@@ -201,7 +237,10 @@ fun HistoryScreen(navController: NavController) {
 
 // ── Individual Session Card ────────────────────────────────────────────────
 @Composable
-fun SessionHistoryCard(session: SessionHistory) {
+fun SessionHistoryCard(
+    session: SessionHistory,
+    onClick: () -> Unit = {}
+) {
     val (statusColor, statusBg) = when (session.riskLabel) {
         "STABLE"  -> Pair(StatusSteady,   Color(0xFFD1FAE5))  // green
         "MONITOR" -> Pair(StatusReview,   Color(0xFFFEF3C7))  // amber
@@ -214,7 +253,9 @@ fun SessionHistoryCard(session: SessionHistory) {
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MedicalSurface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -283,6 +324,63 @@ fun SessionHistoryCard(session: SessionHistory) {
                 ModalityChip(label = "Spiral", value = session.spiralResult)
                 ModalityChip(label = "Wave",   value = session.waveResult)
                 ModalityChip(label = "Typing", value = session.typingResult)
+            }
+
+            // Attending Neurologist Review Indicator & Notes preview
+            if (!session.clinicalNotes.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MedicalPrimaryLight.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.VerifiedUser,
+                            contentDescription = null,
+                            tint = MedicalPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = "Neurologist Notes Available",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = MedicalPrimary
+                            )
+                            Text(
+                                text = "\"${session.clinicalNotes}\"",
+                                fontSize = 11.sp,
+                                color = TextPrimary,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Tap to review full report & download",
+                    fontSize = 11.sp,
+                    color = MedicalPrimary,
+                    fontWeight = FontWeight.Medium
+                )
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MedicalPrimary,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
     }

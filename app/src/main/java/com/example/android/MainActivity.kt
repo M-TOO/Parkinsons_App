@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.android.data.model.SessionState
 import com.example.android.ui.screens.*
 import com.example.android.ui.theme.ParkinsonsAppTheme
 
@@ -55,8 +56,8 @@ class MainActivity : ComponentActivity() {
                             RegisterScreen(
                                 navController = navController,
                                 onRegisterSuccess = { _, _ ->
-                                    navController.navigate("home") {
-                                        popUpTo("login") { inclusive = true }
+                                    navController.navigate("login") {
+                                        popUpTo("register") { inclusive = true }
                                     }
                                 }
                             )
@@ -89,9 +90,28 @@ class MainActivity : ComponentActivity() {
 
                         // 9. Movement Report
                         composable("results") {
+                            val selected = SessionState.selectedSessionForReview
+                            val result = if (selected != null) {
+                                AssessmentResult(
+                                    overallScore = selected.overallScore,
+                                    riskLabel = selected.riskLabel,
+                                    spiralTremorLevel = selected.spiralTremorLevel,
+                                    spiralStatus = selected.spiralStatus,
+                                    waveTremorLevel = selected.waveTremorLevel,
+                                    waveStatus = selected.waveStatus,
+                                    tappingStabilityMatch = selected.tappingStabilityMatch,
+                                    tappingStatus = selected.tappingStatus,
+                                    clinicalNotes = selected.clinicalNotes,
+                                    reviewedBy = selected.reviewedBy,
+                                    screeningDate = selected.date,
+                                    sessionId = selected.sessionId
+                                )
+                            } else {
+                                AssessmentResult()
+                            }
                             ResultsScreen(
                                 navController = navController,
-                                result = AssessmentResult()
+                                result = result
                             )
                         }
 
