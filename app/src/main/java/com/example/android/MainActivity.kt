@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.android.ui.screens.AssessmentResult
+import com.example.android.ui.screens.ResultsScreen
 import com.example.android.ui.screens.DrawingTestScreen
 import com.example.android.ui.screens.HomeScreen
 import com.example.android.ui.screens.SplashScreen
@@ -58,6 +60,14 @@ class MainActivity : ComponentActivity() {
                         // 5. Typing Test
                         composable("typing_test") {
                             TypingTestScreen(navController = navController)
+                        }
+
+                        // 6. Movement Report/Resulta Screen
+                        composable("results") {
+                            ResultsScreen(
+                                navController = navController,
+                                result = AssessmentResult() // Demo values until live API is connected
+                            )
                         }
                     }
                 }

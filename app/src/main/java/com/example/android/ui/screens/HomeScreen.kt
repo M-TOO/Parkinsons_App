@@ -112,6 +112,18 @@ fun HomeScreen(navController: NavController) {
             }
 
             item {
+                OutlinedButton(
+                    onClick = { navController.navigate("results") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Assessment, contentDescription = null, tint = MedicalPrimary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("View Sample Movement Report", color = MedicalPrimary)
+                }
+            }
+
+            item {
                 Text(
                     text = "AI Model Tests (Trained Spec)",
                     style = MaterialTheme.typography.titleMedium,
