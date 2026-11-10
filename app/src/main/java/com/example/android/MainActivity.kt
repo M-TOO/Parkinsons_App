@@ -10,12 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.android.ui.screens.AssessmentResult
-import com.example.android.ui.screens.ResultsScreen
-import com.example.android.ui.screens.DrawingTestScreen
-import com.example.android.ui.screens.HomeScreen
-import com.example.android.ui.screens.SplashScreen
-import com.example.android.ui.screens.TypingTestScreen
+import com.example.android.ui.screens.*
 import com.example.android.ui.theme.ParkinsonsAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -35,38 +30,62 @@ class MainActivity : ComponentActivity() {
                         composable("splash") {
                             SplashScreen(
                                 onTimeout = {
-                                    navController.navigate("home") {
+                                    navController.navigate("login") {
                                         popUpTo("splash") { inclusive = true }
                                     }
                                 }
                             )
                         }
 
-                        // 2. Home Dashboard
+                        // 2. Login Screen
+                        composable("login") {
+                            LoginScreen(
+                                navController = navController,
+                                onLoginSuccess = {
+                                    navController.navigate("home") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+                        // 3. Register Screen
+                        composable("register") {
+                            RegisterScreen(
+                                navController = navController,
+                                onRegisterSuccess = { _, _ ->
+                                    navController.navigate("home") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+                        // 4. Home Dashboard
                         composable("home") {
                             HomeScreen(navController = navController)
                         }
 
-                        // 3. AI Spec: Spiral Drawing (Square 1:1 Canvas)
+                        // 5. Spiral Drawing
                         composable("drawing_spiral") {
                             DrawingTestScreen(task = "spiral", navController = navController)
                         }
 
-                        // 4. AI Spec: Wave Drawing (Square 1:1 Canvas)
+                        // 6. Wave Drawing
                         composable("drawing_wave") {
                             DrawingTestScreen(task = "wave", navController = navController)
                         }
 
-                        // 5. Typing Test
+                        // 7. Typing Dynamics Test
                         composable("typing_test") {
                             TypingTestScreen(navController = navController)
                         }
 
-                        // 6. Movement Report/Resulta Screen
+                        // 8. Movement Report
                         composable("results") {
                             ResultsScreen(
                                 navController = navController,
-                                result = AssessmentResult() // Demo values until live API is connected
+                                result = AssessmentResult()
                             )
                         }
                     }
