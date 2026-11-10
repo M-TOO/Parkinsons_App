@@ -2,6 +2,7 @@ package com.example.android.ui.screens
 
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Color as AndroidColor
 import android.graphics.Paint as AndroidPaint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -17,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -29,28 +31,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.android.ui.theme.*
+import java.io.ByteArrayOutputStream
 import kotlin.math.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DrawingTestScreen(
+    task: String = "spiral", // "spiral" or "wave"
     navController: NavController,
-    onComplete: (task: String, score: Float) -> Unit = { _, _ -> }
+    onDrawingExported: (task: String, imageBytes: ByteArray) -> Unit = { _, _ -> }
 ) {
-    // Selected task: "spiral" or "wave"
-    var selectedTask by remember { mutableStateOf("spiral") }
-
-    // List of lines drawn by the user (each line is a list of points)
+    val isSpiral = task == "spiral"
     val lines = remember { mutableStateListOf<List<Offset>>() }
     var currentLine by remember { mutableStateOf<List<Offset>>(emptyList()) }
-
     var testCompleted by remember { mutableStateOf(false) }
-    var calculatedTremorScore by remember { mutableStateOf(0f) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Kinematic Drawing Test", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        if (isSpiral) "Spiral Drawing Test" else "Wave Drawing Test",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -68,74 +72,49 @@ fun DrawingTestScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Task Selector Tabs (Spiral vs Wave)
-            TabRow(
-                selectedTabIndex = if (selectedTask == "spiral") 0 else 1,
-                containerColor = MedicalSurfaceVariant,
-                contentColor = MedicalPrimary,
-                modifier = Modifier.fillMaxWidth().height(44.dp)
-            ) {
-                Tab(
-                    selected = selectedTask == "spiral",
-                    onClick = {
-                        selectedTask = "spiral"
-                        lines.clear()
-                        testCompleted = false
-                    },
-                    text = { Text("Spiral Task", fontWeight = FontWeight.SemiBold) }
-                )
-                Tab(
-                    selected = selectedTask == "wave",
-                    onClick = {
-                        selectedTask = "wave"
-                        lines.clear()
-                        testCompleted = false
-                    },
-                    text = { Text("Wave Task", fontWeight = FontWeight.SemiBold) }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Instructions Banner
+            // AI Spec Instruction Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MedicalSurface),
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = if (selectedTask == "spiral") {
-                        "Trace the spiral from the center outward in one smooth continuous motion without lifting your finger."
-                    } else {
-                        "Trace the sinusoidal wave from left to right smoothly at a steady pace."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(12.dp)
-                )
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = if (isSpiral) "Archimedean Spiral Protocol" else "Sinusoidal Wave Protocol",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MedicalPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isSpiral) {
+                            "Draw a spiral from the center outward in one continuous motion filling the square canvas."
+                        } else {
+                            "Draw a smooth continuous wave from the left edge across to the right edge."
+                        },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Drawing Canvas Card
-            Card(
+            // AI SPEC RULE: Strict 1:1 Square Drawing Canvas (aspectRatio 1f)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .border(1.dp, MedicalOutline, RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                    .aspectRatio(1f) // STRICT SQUARE CANVAS
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .border(2.dp, MedicalOutline, RoundedCornerShape(16.dp))
             ) {
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(selectedTask) {
+                        .pointerInput(Unit) {
                             detectDragGestures(
-                                onDragStart = { offset ->
-                                    currentLine = listOf(offset)
-                                },
-                                onDrag = { change, _ ->
-                                    currentLine = currentLine + change.position
-                                },
+                                onDragStart = { offset -> currentLine = listOf(offset) },
+                                onDrag = { change, _ -> currentLine = currentLine + change.position },
                                 onDragEnd = {
                                     if (currentLine.isNotEmpty()) {
                                         lines.add(currentLine)
@@ -147,62 +126,23 @@ fun DrawingTestScreen(
                 ) {
                     val canvasWidth = size.width
                     val canvasHeight = size.height
-                    val center = Offset(canvasWidth / 2f, canvasHeight / 2f)
 
-                    // 1. Draw faint background template guideline (Spiral or Wave)
-                    if (selectedTask == "spiral") {
-                        val guidePath = Path()
-                        val maxRadius = min(canvasWidth, canvasHeight) * 0.42f
-                        val loops = 3.5f
-                        val pointsCount = 400
-                        for (i in 0..pointsCount) {
-                            val theta = (i.toFloat() / pointsCount) * (loops * 2 * PI.toFloat())
-                            val r = (theta / (loops * 2 * PI.toFloat())) * maxRadius
-                            val x = center.x + r * cos(theta)
-                            val y = center.y + r * sin(theta)
-                            if (i == 0) guidePath.moveTo(x, y) else guidePath.lineTo(x, y)
-                        }
-                        drawPath(
-                            path = guidePath,
-                            color = MedicalOutline.copy(alpha = 0.6f),
-                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                        )
-                    } else {
-                        val guidePath = Path()
-                        val pointsCount = 300
-                        val amplitude = 60.dp.toPx()
-                        for (i in 0..pointsCount) {
-                            val x = (i.toFloat() / pointsCount) * canvasWidth
-                            val y = center.y + amplitude * sin((x / canvasWidth) * 4 * PI.toFloat())
-                            if (i == 0) guidePath.moveTo(x, y) else guidePath.lineTo(x, y)
-                        }
-                        drawPath(
-                            path = guidePath,
-                            color = MedicalOutline.copy(alpha = 0.6f),
-                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                        )
-                    }
-
-                    // 2. Draw user's completed strokes
+                    // 1. Draw User's Strokes in solid medical ink
                     lines.forEach { line ->
                         if (line.size > 1) {
-                            val userPath = Path().apply {
+                            val path = Path().apply {
                                 moveTo(line.first().x, line.first().y)
                                 for (p in line) lineTo(p.x, p.y)
                             }
                             drawPath(
-                                path = userPath,
-                                color = MedicalPrimary,
-                                style = Stroke(
-                                    width = 5.dp.toPx(),
-                                    cap = StrokeCap.Round,
-                                    join = StrokeJoin.Round
-                                )
+                                path = path,
+                                color = Color.Black, // Clean high-contrast ink
+                                style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                             )
                         }
                     }
 
-                    // 3. Draw active stroke currently being dragged
+                    // 2. Active stroke currently being drawn
                     if (currentLine.size > 1) {
                         val activePath = Path().apply {
                             moveTo(currentLine.first().x, currentLine.first().y)
@@ -210,20 +150,16 @@ fun DrawingTestScreen(
                         }
                         drawPath(
                             path = activePath,
-                            color = MedicalPrimaryLight,
-                            style = Stroke(
-                                width = 5.dp.toPx(),
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
+                            color = MedicalPrimary,
+                            style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Action Buttons (Clear & Submit)
+            // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -243,12 +179,11 @@ fun DrawingTestScreen(
 
                 Button(
                     onClick = {
-                        val totalPoints = lines.sumOf { it.size }
-                        if (totalPoints > 20) {
-                            // Calculate local kinematic stability (Offline calculation)
-                            calculatedTremorScore = min(96f, max(75f, 92f - (lines.size * 2f)))
+                        if (lines.isNotEmpty()) {
+                            // AI SPEC REQUIREMENT: Export clean 512x512 plain bitmap (pure white, black ink, no UI)
+                            val exportedBytes = exportClean512Bitmap(lines)
                             testCompleted = true
-                            onComplete(selectedTask, calculatedTremorScore)
+                            onDrawingExported(task, exportedBytes)
                         }
                     },
                     modifier = Modifier.weight(1.5f),
@@ -258,11 +193,11 @@ fun DrawingTestScreen(
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Complete Test")
+                    Text("Complete & Export")
                 }
             }
 
-            // Results Feedback Dialog / Banner
+            // Completion Banner
             if (testCompleted) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Card(
@@ -277,13 +212,13 @@ fun DrawingTestScreen(
                     ) {
                         Column {
                             Text(
-                                text = "Task Kinematics Analyzed",
+                                text = "Square PNG Ready (512x512)",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MedicalPrimary
                             )
                             Text(
-                                text = "Path Fluidity: Steady (Deviation score: $calculatedTremorScore%)",
+                                text = "Formatted for $task AI Model",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -299,4 +234,50 @@ fun DrawingTestScreen(
             }
         }
     }
+}
+
+/**
+ * AI SPEC: Generates a 512x512 square Bitmap with pure white background (#FFFFFF)
+ * and black ink strokes, containing ZERO UI buttons, status bars, or guidelines.
+ */
+fun exportClean512Bitmap(lines: List<List<Offset>>): ByteArray {
+    val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+    val canvas = AndroidCanvas(bitmap)
+    canvas.drawColor(AndroidColor.WHITE) // Plain background
+
+    val paint = AndroidPaint().apply {
+        color = AndroidColor.BLACK
+        strokeWidth = 10f
+        style = AndroidPaint.Style.STROKE
+        strokeCap = AndroidPaint.Cap.ROUND
+        strokeJoin = AndroidPaint.Join.ROUND
+        isAntiAlias = true
+    }
+
+    if (lines.isNotEmpty()) {
+        // Find bounds to normalize to 512x512
+        val allPoints = lines.flatten()
+        val minX = allPoints.minOf { it.x }
+        val maxX = allPoints.maxOf { it.x }
+        val minY = allPoints.minOf { it.y }
+        val maxY = allPoints.maxOf { it.y }
+        val spanX = max(1f, maxX - minX)
+        val spanY = max(1f, maxY - minY)
+
+        lines.forEach { line ->
+            if (line.size > 1) {
+                val path = android.graphics.Path()
+                for ((i, p) in line.withIndex()) {
+                    val normX = 40f + ((p.x - minX) / spanX) * 432f
+                    val normY = 40f + ((p.y - minY) / spanY) * 432f
+                    if (i == 0) path.moveTo(normX, normY) else path.lineTo(normX, normY)
+                }
+                canvas.drawPath(path, paint)
+            }
+        }
+    }
+
+    val stream = ByteArrayOutputStream()
+    bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+    return stream.toByteArray()
 }

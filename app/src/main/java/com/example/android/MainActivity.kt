@@ -40,17 +40,22 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // 2. Home Dashboard Screen
+                        // 2. Home Dashboard
                         composable("home") {
                             HomeScreen(navController = navController)
                         }
 
-                        // 3. Drawing Test Screen
-                        composable("drawing_test") {
-                            DrawingTestScreen(navController = navController)
+                        // 3. AI Spec: Spiral Drawing (Square 1:1 Canvas)
+                        composable("drawing_spiral") {
+                            DrawingTestScreen(task = "spiral", navController = navController)
                         }
 
-                        // 4. Typing Dynamics Test Screen
+                        // 4. AI Spec: Wave Drawing (Square 1:1 Canvas)
+                        composable("drawing_wave") {
+                            DrawingTestScreen(task = "wave", navController = navController)
+                        }
+
+                        // 5. Typing Test
                         composable("typing_test") {
                             TypingTestScreen(navController = navController)
                         }

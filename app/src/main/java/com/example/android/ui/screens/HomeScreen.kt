@@ -34,16 +34,15 @@ fun HomeScreen(navController: NavController) {
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Digital Motor Biomarkers",
+                            text = "AI Digital Biomarker Screening",
                             style = MaterialTheme.typography.labelSmall,
                             color = TextSecondary
                         )
                     }
                 },
                 actions = {
-                    // Class Lecture Concept: Menus & Toolbars (Menus.pdf)
                     IconButton(onClick = { showMenu = !showMenu }) {
-                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Menu Options")
+                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Menu")
                     }
                     DropdownMenu(
                         expanded = showMenu,
@@ -52,35 +51,20 @@ fun HomeScreen(navController: NavController) {
                         DropdownMenuItem(
                             text = { Text("Screening History") },
                             leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
-                            onClick = {
-                                showMenu = false
-                                // Will navigate to history
-                            }
+                            onClick = { showMenu = false }
                         )
                         DropdownMenuItem(
                             text = { Text("Clinician Mode (Admin)") },
                             leadingIcon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
-                            onClick = {
-                                showMenu = false
-                                // Will navigate to admin dashboard
-                            }
-                        )
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("About Assessment") },
-                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
                             onClick = { showMenu = false }
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MedicalSurface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MedicalSurface)
             )
         },
         containerColor = MedicalBackground
     ) { padding ->
-        // Class Lecture Concept: RecyclerView Dynamic List (RecyclerView.pdf)
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -99,29 +83,27 @@ fun HomeScreen(navController: NavController) {
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
-                            text = "Comprehensive Motor Assessment",
+                            text = "AI Motor Screening Protocol",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Complete 4 quick motor tests (approx. 3-5 mins) to generate your digital biomarker stability score.",
+                            text = "Complete 3 validated tests: Spiral Drawing, Wave Drawing, and 5 Keystroke Excerpts.",
                             fontSize = 14.sp,
                             color = Color.White.copy(alpha = 0.85f)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
-                            onClick = {
-                                 navController.navigate("drawing_test")  // <-- Updated
-                            },
+                            onClick = { navController.navigate("drawing_spiral") },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.White,
                                 contentColor = MedicalPrimary
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Begin Assessment", fontWeight = FontWeight.Bold)
+                            Text("Start Test Sequence", fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(Icons.Default.ArrowForward, contentDescription = null)
                         }
@@ -129,56 +111,44 @@ fun HomeScreen(navController: NavController) {
                 }
             }
 
-            // Section Header
             item {
                 Text(
-                    text = "Individual Test Modules",
+                    text = "AI Model Tests (Trained Spec)",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            // Module 1: Drawing Test
+            // Test 1: Spiral Drawing
             item {
                 ModuleCard(
-                    title = "1. Spiral & Wave Drawing",
-                    description = "Draw guided spiral and wave patterns to detect kinematic tremors.",
+                    title = "1. Spiral Drawing Test",
+                    description = "Draw an Archimedean spiral on a 1:1 square canvas. Evaluated by the Drawing Vision Model.",
                     icon = Icons.Default.Gesture,
-                    badgeText = "AI Vision Model",
-                    onClick = { navController.navigate("drawing_test") }
+                    badgeText = "Vision Model (32x32)",
+                    onClick = { navController.navigate("drawing_spiral") }
                 )
             }
 
-            // Module 2: Typing Dynamics
+            // Test 2: Wave Drawing
             item {
                 ModuleCard(
-                    title = "2. Typing Dynamics Test",
-                    description = "Measure millisecond key press and flight intervals.",
+                    title = "2. Wave Drawing Test",
+                    description = "Draw a sinusoidal wave pattern across a square canvas to evaluate kinematic tremor.",
+                    icon = Icons.Default.Gesture,
+                    badgeText = "Vision Model (32x32)",
+                    onClick = { navController.navigate("drawing_wave") }
+                )
+            }
+
+            // Test 3: Typing Dynamics (5 Excerpts)
+            item {
+                ModuleCard(
+                    title = "3. Typing Dynamics Test",
+                    description = "Collect 5 text excerpts capturing millisecond press/release times and touch pressure.",
                     icon = Icons.Default.Keyboard,
-                    badgeText = "iPrognosis Model",
+                    badgeText = "iPrognosis Spec (5 Excerpts)",
                     onClick = { navController.navigate("typing_test") }
-                )
-            }
-
-            // Module 3: Tremor Sensor Test
-            item {
-                ModuleCard(
-                    title = "3. 10s Rest Tremor Sensor",
-                    description = "Hold phone flat to analyze 4-6 Hz resting tremor frequencies.",
-                    icon = Icons.Default.Vibration,
-                    badgeText = "Sensor API",
-                    onClick = { /* Navigate to Tremor */ }
-                )
-            }
-
-            // Module 4: Symptom Survey
-            item {
-                ModuleCard(
-                    title = "4. Clinical Symptom Survey",
-                    description = "MDS-UPDRS standardized questionnaire for daily motor symptoms.",
-                    icon = Icons.Default.Assignment,
-                    badgeText = "Clinical Scale",
-                    onClick = { /* Navigate to Survey */ }
                 )
             }
 

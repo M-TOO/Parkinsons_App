@@ -1,56 +1,91 @@
 package com.example.android.ui.screens
 
+import android.os.Build
 import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.android.ui.theme.*
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
+import java.util.UUID
+
+// AI Spec Data Models (Matching Page 3 of Spec)
+data class RawKeyEvent(
+    val press_ms: Long,
+    val release_ms: Long,
+    val pressure: Float
+)
+
+data class TextExcerpt(
+    val excerpt_id: Int,
+    val events: List<RawKeyEvent>
+)
+
+data class TypingSessionPayload(
+    val session_id: String,
+    val device_model: String,
+    val app_version: String,
+    val excerpts: List<TextExcerpt>
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TypingTestScreen(
     navController: NavController,
-    onComplete: (stabilityScore: Float) -> Unit = {}
+    onSessionCompleted: (payload: TypingSessionPayload) -> Unit = {}
 ) {
-    val targetKeystrokes = 30
-    var keystrokeCount by remember { mutableStateOf(0) }
-    var lastTapTime by remember { mutableStateOf(0L) }
-    val tapIntervals = remember { mutableStateListOf<Long>() }
+    // 5 Standard Text Prompts as specified by AI team (1 long, 4 standard)
+    val promptSentences = remember {
+        listOf(
+            "The quick brown fox jumps over the lazy dog repeatedly until the rhythm of the typing motion is recorded clearly.",
+            "Pack my box with five dozen liquor jugs at the station.",
+            "How vexingly quick daft zebras jump over the low garden fence.",
+            "Sphinx of black quartz judge my vow in the morning daylight.",
+            "Two driven jocks help fax my big quiz to the clinical laboratory."
+        )
+    }
 
-    var activeKey by remember { mutableStateOf<String?>(null) }
+    var currentExcerptIndex by remember { mutableIntStateOf(0) } // 0 to 4 (5 excerpts)
+    val completedExcerpts = remember { mutableStateListOf<TextExcerpt>() }
+
+    // Active excerpt recording
+    val activeEvents = remember { mutableStateListOf<RawKeyEvent>() }
+    var typedDisplayBuffer by remember { mutableStateOf("") }
     var testFinished by remember { mutableStateOf(false) }
-    var calculatedStability by remember { mutableStateOf(0f) }
 
-    val progress by animateFloatAsState(
-        targetValue = min(1f, keystrokeCount.toFloat() / targetKeystrokes.toFloat()),
-        label = "progress"
+    val currentTargetPrompt = promptSentences[currentExcerptIndex]
+    val minEventsRequired = if (currentExcerptIndex == 0) 40 else 25
+
+    val excerptProgress by animateFloatAsState(
+        targetValue = (activeEvents.size.toFloat() / minEventsRequired.toFloat()).coerceIn(0f, 1f),
+        label = "eventsProgress"
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Typing Dynamics Test", fontWeight = FontWeight.Bold) },
+                title = { Text("Typing Dynamics (5 Excerpts)", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -68,235 +103,311 @@ fun TypingTestScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Instructions Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MedicalSurface),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Finger Tapping Rhythm Exercise",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MedicalPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Tap the two alternating buttons below (LEFT and RIGHT) as rapidly and steadily as possible with your index finger.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Progress Header
+            // Excerpt Counter Badge & Overall Progress
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MedicalPrimaryLight.copy(alpha = 0.2f)
+                ) {
+                    Text(
+                        text = "EXCERPT ${currentExcerptIndex + 1} OF 5",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MedicalPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 Text(
-                    text = "Taps: $keystrokeCount / $targetKeystrokes",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "${(progress * 100).toInt()}% Complete",
+                    text = "Events: ${activeEvents.size} / $minEventsRequired min",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MedicalPrimary,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { excerptProgress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
                 color = MedicalPrimary,
                 trackColor = MedicalSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Dual Alternating Tapping Pads
-            Row(
+            // Target Prompt Card
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                colors = CardDefaults.cardColors(containerColor = MedicalSurface),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                // Button LEFT
-                Button(
-                    onClick = {
-                        if (!testFinished) {
-                            val now = SystemClock.uptimeMillis()
-                            if (lastTapTime > 0) {
-                                tapIntervals.add(now - lastTapTime)
-                            }
-                            lastTapTime = now
-                            keystrokeCount++
-                            activeKey = "LEFT"
-
-                            if (keystrokeCount >= targetKeystrokes) {
-                                testFinished = true
-                                // Calculate variance in tap intervals (stability metric)
-                                val avg = tapIntervals.average()
-                                val variance = tapIntervals.map { abs(it - avg) }.average()
-                                calculatedStability = max(70f, min(96f, (100f - (variance * 0.15f)).toFloat()))
-                                onComplete(calculatedStability)
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .size(130.dp)
-                        .border(
-                            width = if (activeKey == "LEFT") 3.dp else 1.dp,
-                            color = if (activeKey == "LEFT") MedicalPrimaryLight else MedicalOutline,
-                            shape = CircleShape
-                        ),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (activeKey == "LEFT") MedicalPrimaryLight.copy(alpha = 0.2f) else MedicalSurface,
-                        contentColor = MedicalPrimary
-                    ),
-                    enabled = !testFinished
-                ) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "LEFT\nTAP",
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
+                        text = "Type the prompt below:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted
                     )
-                }
-
-                // Button RIGHT
-                Button(
-                    onClick = {
-                        if (!testFinished) {
-                            val now = SystemClock.uptimeMillis()
-                            if (lastTapTime > 0) {
-                                tapIntervals.add(now - lastTapTime)
-                            }
-                            lastTapTime = now
-                            keystrokeCount++
-                            activeKey = "RIGHT"
-
-                            if (keystrokeCount >= targetKeystrokes) {
-                                testFinished = true
-                                val avg = tapIntervals.average()
-                                val variance = tapIntervals.map { abs(it - avg) }.average()
-                                calculatedStability = max(70f, min(96f, (100f - (variance * 0.15f)).toFloat()))
-                                onComplete(calculatedStability)
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .size(130.dp)
-                        .border(
-                            width = if (activeKey == "RIGHT") 3.dp else 1.dp,
-                            color = if (activeKey == "RIGHT") MedicalPrimaryLight else MedicalOutline,
-                            shape = CircleShape
-                        ),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (activeKey == "RIGHT") MedicalPrimaryLight.copy(alpha = 0.2f) else MedicalSurface,
-                        contentColor = MedicalPrimary
-                    ),
-                    enabled = !testFinished
-                ) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "RIGHT\nTAP",
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
+                        text = currentTargetPrompt,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = TextPrimary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Real-Time Feedback Card
-            if (tapIntervals.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MedicalSurface),
-                    shape = RoundedCornerShape(12.dp)
+            // User Typed Text Buffer Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MedicalOutline)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    contentAlignment = Alignment.TopStart
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Last Interval", style = MaterialTheme.typography.labelSmall)
-                            Text("${tapIntervals.last()} ms", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MedicalPrimary)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Rhythm", style = MaterialTheme.typography.labelSmall)
-                            Text("Cadence Steady", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = StatusSteady)
+                    Text(
+                        text = if (typedDisplayBuffer.isEmpty()) "Start typing on the keypad below..." else typedDisplayBuffer,
+                        color = if (typedDisplayBuffer.isEmpty()) TextMuted else TextPrimary,
+                        fontSize = 15.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // AI SPEC ON-SCREEN KEYBOARD (Captures press_ms, release_ms, and pressure)
+            OnScreenTypingKeypad(
+                onKeyRecorded = { event, charPressed ->
+                    if (!testFinished) {
+                        activeEvents.add(event)
+                        if (charPressed == "⌫") {
+                            if (typedDisplayBuffer.isNotEmpty()) {
+                                typedDisplayBuffer = typedDisplayBuffer.dropLast(1)
+                            }
+                        } else {
+                            typedDisplayBuffer += charPressed
                         }
                     }
                 }
-            }
+            )
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Completion Banner
+            // Navigation to Next Excerpt or Finish Test
+            if (activeEvents.size >= minEventsRequired) {
+                Button(
+                    onClick = {
+                        // Save current excerpt
+                        completedExcerpts.add(
+                            TextExcerpt(
+                                excerpt_id = currentExcerptIndex + 1,
+                                events = activeEvents.toList()
+                            )
+                        )
+                        activeEvents.clear()
+                        typedDisplayBuffer = ""
+
+                        if (currentExcerptIndex < 4) {
+                            currentExcerptIndex++
+                        } else {
+                            // All 5 excerpts complete! Generate payload
+                            testFinished = true
+                            val finalPayload = TypingSessionPayload(
+                                session_id = UUID.randomUUID().toString(),
+                                device_model = Build.MODEL,
+                                app_version = "1.0.0",
+                                excerpts = completedExcerpts.toList()
+                            )
+                            onSessionCompleted(finalPayload)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary)
+                ) {
+                    Text(
+                        text = if (currentExcerptIndex < 4) "Save Excerpt & Continue (${currentExcerptIndex + 1}/5)" else "Complete Typing Test",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        if (currentExcerptIndex < 4) Icons.Default.NavigateNext else Icons.Default.Check,
+                        contentDescription = null
+                    )
+                }
+            }
+
+            // Test Completed Banner
             if (testFinished) {
+                Spacer(modifier = Modifier.height(10.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MedicalSurfaceVariant),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "5 Excerpts Successfully Recorded",
+                                fontWeight = FontWeight.Bold,
+                                color = MedicalPrimary,
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = "Total Keystrokes: ${completedExcerpts.sumOf { it.events.size }} (AI Spec Ready)",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Button(
+                            onClick = { navController.navigateUp() },
+                            colors = ButtonDefaults.buttonColors(containerColor = StatusSteady),
+                            shape = RoundedCornerShape(6.dp)
                         ) {
-                            Column {
-                                Text(
-                                    text = "Rhythm Cadence Computed",
-                                    fontWeight = FontWeight.Bold,
-                                    color = MedicalPrimary,
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    text = "Tap Interval Stability: $calculatedStability% (Steady)",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            Button(
-                                onClick = { navController.navigateUp() },
-                                colors = ButtonDefaults.buttonColors(containerColor = StatusSteady),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text("Done")
-                            }
+                            Text("Done")
                         }
                     }
                 }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        keystrokeCount = 0
-                        tapIntervals.clear()
-                        lastTapTime = 0L
-                        activeKey = null
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, tint = TextSecondary)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Reset Tapping Sequence", color = TextSecondary)
+            }
+        }
+    }
+}
+
+/**
+ * On-Screen Medical Touchpad Keyboard that captures:
+ * 1. press_ms (SystemClock.uptimeMillis())
+ * 2. release_ms (SystemClock.uptimeMillis())
+ * 3. pressure (Touch Pressure normalized 0.0 to 1.0)
+ */
+@Composable
+fun OnScreenTypingKeypad(
+    onKeyRecorded: (event: RawKeyEvent, char: String) -> Unit
+) {
+    val keyboardRows = listOf(
+        listOf("Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),
+        listOf("A", "S", "D", "F", "G", "H", "J", "K", "L"),
+        listOf("Z", "X", "C", "V", "B", "N", "M", "⌫")
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        keyboardRows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                row.forEach { keyLabel ->
+                    KeyCapButton(
+                        label = keyLabel,
+                        modifier = Modifier
+                            .padding(horizontal = 2.dp)
+                            .weight(if (keyLabel == "⌫") 1.5f else 1f),
+                        onKeyRecord = { event ->
+                            onKeyRecorded(event, keyLabel.lowercase())
+                        }
+                    )
                 }
             }
+        }
+
+        // Spacebar Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            KeyCapButton(
+                label = "SPACE",
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .padding(top = 4.dp),
+                onKeyRecord = { event ->
+                    onKeyRecorded(event, " ")
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun KeyCapButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    onKeyRecord: (RawKeyEvent) -> Unit
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    var pressDownTime by remember { mutableLongStateOf(0L) }
+    var pressPressure by remember { mutableFloatStateOf(0.5f) }
+
+    Surface(
+        modifier = modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .pointerInput(label) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitPointerEvent()
+                        val change = down.changes.firstOrNull() ?: continue
+
+                        if (change.pressed && !isPressed) {
+                            // Key Pressed Down
+                            isPressed = true
+                            pressDownTime = SystemClock.uptimeMillis()
+                            pressPressure = change.pressure.coerceIn(0.1f, 1.0f)
+                            change.consume()
+                        } else if (!change.pressed && isPressed) {
+                            // Key Released Up
+                            isPressed = false
+                            val releaseTime = SystemClock.uptimeMillis()
+                            val event = RawKeyEvent(
+                                press_ms = pressDownTime,
+                                release_ms = releaseTime,
+                                pressure = pressPressure
+                            )
+                            onKeyRecord(event)
+                            change.consume()
+                        }
+                    }
+                }
+            },
+        color = if (isPressed) MedicalPrimaryLight.copy(alpha = 0.35f) else MedicalSurface,
+        shape = RoundedCornerShape(6.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MedicalOutline),
+        shadowElevation = 1.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                fontSize = if (label == "SPACE") 12.sp else 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
         }
     }
 }
