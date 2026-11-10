@@ -113,7 +113,7 @@ fun HomeScreen(navController: NavController) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = {
-                                // Will navigate to test sequence
+                                 navController.navigate("drawing_test")  // <-- Updated
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.White,
@@ -145,7 +145,7 @@ fun HomeScreen(navController: NavController) {
                     description = "Draw guided spiral and wave patterns to detect kinematic tremors.",
                     icon = Icons.Default.Gesture,
                     badgeText = "AI Vision Model",
-                    onClick = { /* Navigate to Drawing */ }
+                    onClick = { navController.navigate("drawing_test") }
                 )
             }
 
