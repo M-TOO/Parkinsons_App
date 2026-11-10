@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, CheckConstraint, Text
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -20,7 +20,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Referential integrity: Links user to their sessions with cascade delete
-    sessions = relationship("AssessmentSession", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("AssessmentSession", back_populates="user", cascade="all, delete-orphan", order_by="desc(AssessmentSession.created_at)")
 
 
 class AssessmentSession(Base):
@@ -54,6 +54,12 @@ class AssessmentSession(Base):
     spiral_pd_score = Column(Float, nullable=True)
     wave_pd_score = Column(Float, nullable=True)
     model_version = Column(String(100), nullable=True)
+
+    # Clinician & Neurologist Review Fields (Section 10)
+    clinical_notes = Column(Text, nullable=True)
+    review_status = Column(String(50), default="Pending Review", nullable=False) # "Pending Review", "Reviewed - Stable", "Follow-up Required"
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
