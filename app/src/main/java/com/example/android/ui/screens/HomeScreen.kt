@@ -156,7 +156,7 @@ fun HomeScreen(navController: NavController) {
                     description = "Measure millisecond key press and flight intervals.",
                     icon = Icons.Default.Keyboard,
                     badgeText = "iPrognosis Model",
-                    onClick = { /* Navigate to Typing */ }
+                    onClick = { navController.navigate("typing_test") }
                 )
             }
 

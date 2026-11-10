@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.android.ui.screens.DrawingTestScreen
 import com.example.android.ui.screens.HomeScreen
 import com.example.android.ui.screens.SplashScreen
+import com.example.android.ui.screens.TypingTestScreen
 import com.example.android.ui.theme.ParkinsonsAppTheme
 
 class MainActivity : ComponentActivity() {
@@ -47,6 +48,11 @@ class MainActivity : ComponentActivity() {
                         // 3. Drawing Test Screen
                         composable("drawing_test") {
                             DrawingTestScreen(navController = navController)
+                        }
+
+                        // 4. Typing Dynamics Test Screen
+                        composable("typing_test") {
+                            TypingTestScreen(navController = navController)
                         }
                     }
                 }
