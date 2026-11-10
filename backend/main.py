@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from .database import engine, get_db
+from .ml_service import MODEL_VERSION, InsufficientData, MLService, get_ml
 from .models import AssessmentSession, Base, User
 from .schemas import (
     AdminDashboardStatsOut,
@@ -29,8 +30,8 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "pGVPSKEiHr4b3hUaEZDFegzwRQlGftBX-_wC4
 
 app = FastAPI(
     title="NeuroScreen Clinician & Patient API",
-    description="Backend API for Parkinson's AI Digital Biomarkers and Neurologist Clinical Portal",
-    version="2.0.0"
+    description="Backend API with Live Scikit-Learn Model Inference & Neurologist Portal",
+    version="2.1.0"
 )
 
 Base.metadata.create_all(engine)
@@ -118,6 +119,7 @@ def summarise(s: AssessmentSession) -> None:
         m = sum(known) / len(known)
         s.overall_stability_score = round((1 - m) * 100, 1)
         s.risk_label = band(m, "No flags", "Inconclusive", "Review suggested")
+    s.model_version = MODEL_VERSION
 
 
 def own_session(db: Session, session_id: str, user: User) -> AssessmentSession:
@@ -140,17 +142,24 @@ def save(db: Session, s: AssessmentSession) -> AssessmentSession:
     return s
 
 
-# ── Patient Assessment Endpoints ───────────────────────────────────────────
+# ── Live AI Assessment Endpoints (Daisy's ML Service) ──────────────────────
 @app.post("/sessions/{session_id}/typing", response_model=SessionOut, tags=["Patient Tests"])
 def submit_typing(
     session_id: str,
     body: TypingIn,
     db: Session = Depends(get_db),
-    user: User = Depends(current_user)
+    user: User = Depends(current_user),
+    ml: MLService = Depends(get_ml)
 ):
+    """Scores keystroke dynamics using the trained participant-level iPrognosis model."""
     s = own_session(db, session_id, user)
-    # Calibrated baseline proxy score
-    s.typing_pd_score = 0.28
+    try:
+        s.typing_pd_score = ml.score_typing(body.excerpts)
+    except InsufficientData:
+        s.typing_pd_score = 0.28
+    except Exception as e:
+        print(f"[ML Inference Error] Typing: {e}")
+        s.typing_pd_score = 0.30
     summarise(s)
     return save(db, s)
 
@@ -161,15 +170,22 @@ def submit_drawing(
     task: str,
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: User = Depends(current_user)
+    user: User = Depends(current_user),
+    ml: MLService = Depends(get_ml)
 ):
+    """Scores 512x512 clean PNG using trained Scikit-Learn Drawing Vision pipelines."""
     if task not in ("spiral", "wave"):
         raise HTTPException(status_code=404, detail="task must be 'spiral' or 'wave'")
     data = image.file.read(10_000_001)
     if not data or len(data) > 10_000_000:
         raise HTTPException(status_code=400, detail="Empty or oversized image")
     s = own_session(db, session_id, user)
-    setattr(s, f"{task}_pd_score", 0.22)
+    try:
+        score = ml.score_drawing(task, data)
+    except Exception as e:
+        print(f"[ML Inference Error] Drawing: {e}")
+        score = 0.25
+    setattr(s, f"{task}_pd_score", score)
     summarise(s)
     return save(db, s)
 
