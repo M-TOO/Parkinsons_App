@@ -16,6 +16,7 @@ class User(Base):
         CheckConstraint("year_of_birth >= 1900 AND year_of_birth <= 2026"), 
         nullable=False
     )
+    role = Column(String(20), default="patient", nullable=False)  # "patient" or "admin"
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Referential integrity: Links user to their sessions with cascade delete
@@ -47,6 +48,12 @@ class AssessmentSession(Base):
     reaction_speed_pct = Column(Float, nullable=True)
     spatial_precision_pct = Column(Float, nullable=True)
     coordination_status = Column(String(50), nullable=True)
+
+    # Raw model outputs
+    typing_pd_score = Column(Float, nullable=True)
+    spiral_pd_score = Column(Float, nullable=True)
+    wave_pd_score = Column(Float, nullable=True)
+    model_version = Column(String(100), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 

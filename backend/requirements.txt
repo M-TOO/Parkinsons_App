@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+pymysql
+pydantic[email]
+bcrypt
+pyjwt
+python-multipart
+scikit-learn
+numpy
+pandas
+scipy
+pillow
+joblib
