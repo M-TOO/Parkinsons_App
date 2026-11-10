@@ -60,7 +60,10 @@ fun HomeScreen(navController: NavController) {
                         DropdownMenuItem(
                             text = { Text("Clinician Mode (Admin)") },
                             leadingIcon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
-                            onClick = { showMenu = false }
+                            onClick = {
+                                showMenu = false
+                                navController.navigate("admin_dashboard")
+                            }
                         )
                         HorizontalDivider()
                         DropdownMenuItem(

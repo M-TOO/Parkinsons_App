@@ -37,12 +37,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // 2. Login Screen
+                        // 2. Login Screen (Role-Based Access Control)
                         composable("login") {
                             LoginScreen(
                                 navController = navController,
-                                onLoginSuccess = {
-                                    navController.navigate("home") {
+                                onLoginSuccess = { role ->
+                                    val destination = if (role == "admin") "admin_dashboard" else "home"
+                                    navController.navigate(destination) {
                                         popUpTo("login") { inclusive = true }
                                     }
                                 }
@@ -92,6 +93,11 @@ class MainActivity : ComponentActivity() {
                                 navController = navController,
                                 result = AssessmentResult()
                             )
+                        }
+
+                        // 10. Clinician & Neurologist Portal (M-TOO)
+                        composable("admin_dashboard") {
+                            AdminDashboardScreen(navController = navController)
                         }
                     }
                 }

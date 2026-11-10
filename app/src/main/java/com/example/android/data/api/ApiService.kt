@@ -29,4 +29,20 @@ interface ApiService {
 
     @GET("sessions")
     suspend fun getSessions(): Response<List<SessionOut>>
+
+    // ── Clinician & Admin Portal Endpoints ─────────────────────────────────
+    @GET("admin/stats")
+    suspend fun getAdminStats(): Response<AdminDashboardStats>
+
+    @GET("admin/patients")
+    suspend fun getAdminPatients(): Response<List<PatientSummary>>
+
+    @GET("admin/flagged")
+    suspend fun getFlaggedSessions(): Response<List<FlaggedSession>>
+
+    @PATCH("admin/sessions/{session_id}/review")
+    suspend fun submitClinicalReview(
+        @Path("session_id") sessionId: String,
+        @Body body: ClinicalReviewRequest
+    ): Response<SessionOut>
 }

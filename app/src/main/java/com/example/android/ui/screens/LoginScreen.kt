@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     navController: NavController,
-    onLoginSuccess: () -> Unit = {}
+    onLoginSuccess: (role: String) -> Unit = {}
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -167,8 +167,8 @@ fun LoginScreen(
                                     coroutineScope.launch {
                                         val result = repository.login(email.trim(), password)
                                         isLoading = false
-                                        result.onSuccess {
-                                            onLoginSuccess()
+                                        result.onSuccess { tokenResp ->
+                                            onLoginSuccess(tokenResp.user.role)
                                         }.onFailure { err ->
                                             errorMessage = err.localizedMessage ?: "Invalid email or password"
                                         }
