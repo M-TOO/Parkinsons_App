@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -60,6 +61,18 @@ fun HomeScreen(navController: NavController) {
                             text = { Text("Clinician Mode (Admin)") },
                             leadingIcon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) },
                             onClick = { showMenu = false }
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Sign Out", color = StatusAtypical) },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = StatusAtypical) },
+                            onClick = {
+                                showMenu = false
+                                com.example.android.data.api.ApiClient.clearToken()
+                                navController.navigate("login") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
                         )
                     }
                 },

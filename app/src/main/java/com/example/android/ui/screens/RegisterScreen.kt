@@ -22,7 +22,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.android.data.repository.AssessmentRepository
 import com.example.android.ui.theme.*
+import kotlinx.coroutines.launch
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +40,10 @@ fun RegisterScreen(
     var yearOfBirth by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
 
+    val coroutineScope = rememberCoroutineScope()
+    val repository = remember { AssessmentRepository() }
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
 
     Box(
@@ -112,7 +117,7 @@ fun RegisterScreen(
                         )
                     )
 
-                    // Year of Birth (Mandatory for AI age-calibrated baselines)
+                    // Year of Birth
                     OutlinedTextField(
                         value = yearOfBirth,
                         onValueChange = { if (it.length <= 4) yearOfBirth = it; errorMessage = null },
@@ -198,21 +203,34 @@ fun RegisterScreen(
                                 password.length < 8 -> errorMessage = "Password must be at least 8 characters."
                                 password != confirmPassword -> errorMessage = "Passwords do not match."
                                 else -> {
-                                    // DEMO MODE: Register accepted
-                                    // Will call POST /register via Retrofit in Section 9
-                                    onRegisterSuccess(fullName, email)
+                                    isLoading = true
+                                    errorMessage = null
+                                    coroutineScope.launch {
+                                        val result = repository.register(fullName.trim(), email.trim(), password, yob)
+                                        isLoading = false
+                                        result.onSuccess {
+                                            onRegisterSuccess(fullName, email)
+                                        }.onFailure { err ->
+                                            errorMessage = err.localizedMessage ?: "Registration failed"
+                                        }
+                                    }
                                 }
                             }
                         },
+                        enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary)
                     ) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Create Account", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        if (isLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.Default.PersonAdd, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Create Account", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
                     }
 
                     // Back to Login

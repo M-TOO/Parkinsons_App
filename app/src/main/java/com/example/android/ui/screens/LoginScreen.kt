@@ -21,7 +21,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.android.data.repository.AssessmentRepository
 import com.example.android.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +35,10 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val repository = remember { AssessmentRepository() }
 
     Box(
         modifier = Modifier
@@ -156,21 +162,34 @@ fun LoginScreen(
                                 password.length < 6 ->
                                     errorMessage = "Password must be at least 6 characters."
                                 else -> {
-                                    // DEMO MODE: any valid-format credentials succeed
-                                    // Will call POST /login via Retrofit in Section 9
-                                    onLoginSuccess()
+                                    isLoading = true
+                                    errorMessage = null
+                                    coroutineScope.launch {
+                                        val result = repository.login(email.trim(), password)
+                                        isLoading = false
+                                        result.onSuccess {
+                                            onLoginSuccess()
+                                        }.onFailure { err ->
+                                            errorMessage = err.localizedMessage ?: "Invalid email or password"
+                                        }
+                                    }
                                 }
                             }
                         },
+                        enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary)
                     ) {
-                        Icon(Icons.Default.Login, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sign In", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        if (isLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.Default.Login, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Sign In", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
                     }
 
                     // Create Account Link

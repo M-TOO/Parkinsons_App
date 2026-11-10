@@ -8,7 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.android.data.repository.AssessmentRepository
 import com.example.android.ui.theme.*
 
 // ── Data model for a past session ──────────────────────────────────────────
@@ -28,19 +29,55 @@ data class SessionHistory(
     val typingResult: String
 )
 
-// ── Demo data (replaced by GET /sessions in Section 9) ────────────────────
-private val mockHistory = listOf(
-    SessionHistory("10 Nov 2026", 88, "STABLE",   "Fluid",    "Fluid",    "Steady"),
-    SessionHistory("03 Nov 2026", 74, "MONITOR",  "Mild",     "Fluid",    "Variable"),
-    SessionHistory("27 Oct 2026", 61, "MONITOR",  "Mild",     "Mild",     "Variable"),
-    SessionHistory("15 Oct 2026", 45, "ATYPICAL", "Elevated", "Elevated", "Irregular"),
-    SessionHistory("01 Oct 2026", 79, "STABLE",   "Fluid",    "Mild",     "Steady")
+// ── Demo fallback data (shown when new account has 0 tests yet) ────────────
+private val fallbackHistory = listOf(
+    SessionHistory("Sample Screening", 88, "STABLE", "Fluid", "Fluid", "Steady")
 )
 
 // ── Main Screen ────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(navController: NavController) {
+    val repository = remember { AssessmentRepository() }
+    var sessions by remember { mutableStateOf<List<SessionHistory>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        isLoading = true
+        val result = repository.getSessions()
+        result.onSuccess { list ->
+            if (list.isNotEmpty()) {
+                sessions = list.map { s ->
+                    val cleanDate = try {
+                        s.created_at.replace("T", " ").take(16)
+                    } catch (e: Exception) {
+                        s.created_at
+                    }
+                    val label = when (s.risk_label) {
+                        "No flags", "Typical pattern" -> "STABLE"
+                        "Inconclusive" -> "MONITOR"
+                        "Review suggested", "Atypical pattern" -> "ATYPICAL"
+                        else -> s.risk_label ?: "STABLE"
+                    }
+                    SessionHistory(
+                        date = cleanDate,
+                        score = s.overall_stability_score?.toInt() ?: 80,
+                        riskLabel = label,
+                        spiralResult = s.drawing_status ?: "Fluid",
+                        waveResult = s.drawing_tremor_level ?: "Low",
+                        typingResult = s.tapping_status ?: "Steady"
+                    )
+                }
+            } else {
+                sessions = emptyList()
+            }
+        }.onFailure { err ->
+            errorMessage = err.localizedMessage
+        }
+        isLoading = false
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -48,9 +85,9 @@ fun HistoryScreen(navController: NavController) {
                     Column {
                         Text("Screening History", fontWeight = FontWeight.Bold)
                         Text(
-                            "Past motor assessments",
+                            "Live Database Sessions",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted
+                            color = MedicalPrimaryLight
                         )
                     }
                 },
@@ -64,50 +101,98 @@ fun HistoryScreen(navController: NavController) {
                 )
             )
         },
-        containerColor = MedicalBackground   // ← was BackgroundLight (doesn't exist)
+        containerColor = MedicalBackground
     ) { padding ->
-        if (mockHistory.isEmpty()) {
-            // Empty state
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = TextMuted
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("No assessments yet", color = TextMuted, fontSize = 16.sp)
-                    Text(
-                        "Complete your first screening from the Home screen",
-                        color = TextMuted,
-                        fontSize = 13.sp
-                    )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            when {
+                isLoading -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(color = MedicalPrimary)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Loading sessions from server...", color = TextMuted, fontSize = 14.sp)
+                    }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    Text(
-                        text = "${mockHistory.size} sessions recorded",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextMuted,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
+                sessions.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = TextMuted
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "No assessments recorded yet",
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontSize = 17.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "When you complete motor assessments, your results and stability scores will appear here in real time.",
+                            color = TextMuted,
+                            fontSize = 13.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Button(
+                            onClick = { navController.navigate("home") },
+                            colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Start an Assessment")
+                        }
+                    }
                 }
-                items(mockHistory) { session ->
-                    SessionHistoryCard(session)
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${sessions.size} session(s) in database",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextMuted
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = StatusSteady.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "LIVE SYNC",
+                                        color = StatusSteady,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                        items(sessions) { session ->
+                            SessionHistoryCard(session)
+                        }
+                    }
                 }
             }
         }
