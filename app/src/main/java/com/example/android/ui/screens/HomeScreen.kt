@@ -51,7 +51,10 @@ fun HomeScreen(navController: NavController) {
                         DropdownMenuItem(
                             text = { Text("Screening History") },
                             leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
-                            onClick = { showMenu = false }
+                            onClick = {
+                                showMenu = false
+                                navController.navigate("history")
+                            }
                         )
                         DropdownMenuItem(
                             text = { Text("Clinician Mode (Admin)") },

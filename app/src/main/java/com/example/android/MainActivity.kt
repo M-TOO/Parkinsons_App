@@ -81,7 +81,12 @@ class MainActivity : ComponentActivity() {
                             TypingTestScreen(navController = navController)
                         }
 
-                        // 8. Movement Report
+                        // 8. Screening History
+                        composable("history") {
+                            HistoryScreen(navController = navController)
+                        }
+
+                        // 9. Movement Report
                         composable("results") {
                             ResultsScreen(
                                 navController = navController,
