@@ -1,6 +1,7 @@
 package com.example.android.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -352,7 +353,36 @@ fun ResultsScreen(
                 }
             }
 
-            // 10. Home Button
+            // 10. Find Nearby Neurology Clinic (Google Maps integration from MAD Topic)
+            item {
+                OutlinedButton(
+                    onClick = {
+                        // Geo intent to search for nearest neurology clinics / movement specialists
+                        val mapUri = Uri.parse("geo:0,0?q=neurology+clinic+hospital")
+                        val mapIntent = Intent(Intent.ACTION_VIEW, mapUri).apply {
+                            `package` = "com.google.android.apps.maps"
+                        }
+                        try {
+                            context.startActivity(mapIntent)
+                        } catch (e: Exception) {
+                            // Fallback if Google Maps app is not installed
+                            val browserMap = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/neurology+clinic+hospital"))
+                            context.startActivity(browserMap)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MedicalSecondary)
+                ) {
+                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = MedicalSecondary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Find Nearby Neurologist (Google Maps)", fontWeight = FontWeight.Bold, color = MedicalSecondary)
+                }
+            }
+
+            // 11. Home Button
             item {
                 Button(
                     onClick = {

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,10 +23,27 @@ import com.example.android.data.model.DetailedScreeningReview
 import com.example.android.data.model.SessionState
 import com.example.android.data.repository.AssessmentRepository
 import com.example.android.ui.theme.*
+import com.example.android.util.NetworkMonitor
+import com.example.android.util.PowerStatusReceiver
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController) {
+    val context = LocalContext.current
+    val networkMonitor = remember { NetworkMonitor(context) }
+    val isOnline by networkMonitor.isConnected
+
+    val powerReceiver = remember { PowerStatusReceiver(context) }
+    val isCharging by powerReceiver.isCharging
+    val isLowBattery by powerReceiver.isLowBattery
+
+    DisposableEffect(Unit) {
+        powerReceiver.register()
+        onDispose {
+            powerReceiver.unregister()
+        }
+    }
+
     var showMenu by remember { mutableStateOf(false) }
     val repository = remember { AssessmentRepository() }
     var latestSessionReview by remember { mutableStateOf<DetailedScreeningReview?>(null) }
@@ -128,6 +146,56 @@ fun HomeScreen(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // ── Live Network State Banner (Connecting Apps to Internet - Slide 13) ──
+            if (!isOnline) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = StatusAtypical.copy(alpha = 0.12f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.WifiOff, contentDescription = null, tint = StatusAtypical, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Offline Mode: Active tests will sync once connection returns.",
+                                color = StatusAtypical,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Broadcast Receiver Banner: Low Battery Alert (Broadcasts.pdf - Slide 6) ──
+            if (isLowBattery && !isCharging) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = StatusReview.copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.BatteryAlert, contentDescription = null, tint = StatusReview, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Low Battery: Connect device to charger before starting kinematic tests.",
+                                color = StatusReview,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
 
             // Hero Quick-Start Card
             item {
