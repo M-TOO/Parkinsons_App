@@ -49,7 +49,7 @@ fun HomeScreen(navController: NavController) {
     var latestSessionReview by remember { mutableStateOf<DetailedScreeningReview?>(null) }
     var hasPastSessions by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(SessionState.currentSessionId) {
         val result = repository.getSessions()
         result.onSuccess { list ->
             if (list.isNotEmpty()) {
@@ -90,17 +90,21 @@ fun HomeScreen(navController: NavController) {
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = "NeuroScreen",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "AI Digital Biomarker Screening",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        com.example.android.ui.components.NeuroScreenEmblem(size = 36.dp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "NeuroScreen",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "AI Digital Biomarker Screening",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -251,6 +255,40 @@ fun HomeScreen(navController: NavController) {
                         Icon(Icons.Default.Assessment, contentDescription = null, tint = MedicalPrimary)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("View Latest Movement Report (${latestSessionReview!!.date})", color = MedicalPrimary, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                if (!latestSessionReview!!.clinicalNotes.isNullOrBlank()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFFF0FDF4))
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = StatusSteady, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Attending Neurologist Clinical Notes", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MedicalPrimary)
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "\"${latestSessionReview!!.clinicalNotes}\"",
+                                    fontSize = 12.sp,
+                                    color = TextPrimary,
+                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                )
+                                if (!latestSessionReview!!.reviewedBy.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Reviewed by: ${latestSessionReview!!.reviewedBy}",
+                                        fontSize = 11.sp,
+                                        color = TextMuted,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

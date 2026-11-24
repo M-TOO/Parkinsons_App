@@ -293,11 +293,21 @@ fun DrawingTestScreen(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = { navController.navigateUp() },
+                            onClick = {
+                                if (isSpiral) {
+                                    navController.navigate("drawing_wave") {
+                                        popUpTo("drawing_spiral") { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate("typing_test") {
+                                        popUpTo("drawing_wave") { inclusive = true }
+                                    }
+                                }
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = StatusSteady),
                             shape = RoundedCornerShape(6.dp)
                         ) {
-                            Text("Done")
+                            Text(if (isSpiral) "Next: Wave Test →" else "Next: Typing Test →", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

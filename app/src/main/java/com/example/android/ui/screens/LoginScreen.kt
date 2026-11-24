@@ -45,7 +45,7 @@ fun LoginScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(MedicalPrimary, Color(0xFF042F2E))
+                    colors = listOf(MedicalPrimary, MedicalPrimaryDark)
                 )
             )
     ) {
@@ -60,26 +60,11 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             // Logo / Header
-            Icon(
-                imageVector = Icons.Default.MonitorHeart,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(64.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "NeuroScreen",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Text(
-                text = "Digital Motor Biomarker Platform",
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.8f)
-            )
+            com.example.android.ui.components.NeuroScreenEmblem(size = 76.dp)
+            Spacer(modifier = Modifier.height(14.dp))
+            com.example.android.ui.components.NeuroScreenBranding()
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Login Card
             Card(
@@ -168,6 +153,7 @@ fun LoginScreen(
                                         val result = repository.login(email.trim(), password)
                                         isLoading = false
                                         result.onSuccess { tokenResp ->
+                                            com.example.android.data.api.ApiClient.currentUser = tokenResp.user
                                             onLoginSuccess(tokenResp.user.role)
                                         }.onFailure { err ->
                                             errorMessage = err.localizedMessage ?: "Invalid email or password"

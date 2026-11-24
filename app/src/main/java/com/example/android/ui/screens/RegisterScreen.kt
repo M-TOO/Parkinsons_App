@@ -52,7 +52,7 @@ fun RegisterScreen(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(MedicalPrimary, Color(0xFF042F2E))
+                    colors = listOf(MedicalPrimary, MedicalPrimaryDark)
                 )
             )
     ) {
@@ -66,17 +66,12 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Header
-            Icon(
-                imageVector = Icons.Default.PersonAdd,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+            com.example.android.ui.components.NeuroScreenEmblem(size = 64.dp)
+            Spacer(modifier = Modifier.height(12.dp))
             Text("Create Patient Account", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text("Register to begin your motor screening", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),

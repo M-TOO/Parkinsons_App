@@ -16,8 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.android.ui.components.NeuroScreenBranding
+import com.example.android.ui.components.NeuroScreenEmblem
 import com.example.android.ui.theme.MedicalPrimary
-import com.example.android.ui.theme.MedicalPrimaryLight
+import com.example.android.ui.theme.MedicalPrimaryDark
 import kotlinx.coroutines.delay
 
 @Composable
@@ -47,7 +49,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         MedicalPrimary,
-                        Color(0xFF042F2E) // Deep medical emerald
+                        MedicalPrimaryDark
                     )
                 )
             ),
@@ -58,45 +60,22 @@ fun SplashScreen(onTimeout: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(24.dp)
         ) {
-            Surface(
-                modifier = Modifier
-                    .size(100.dp)
-                    .scale(scale),
-                shape = CircleShape,
-                color = MedicalPrimaryLight.copy(alpha = 0.25f)
+            Box(
+                modifier = Modifier.scale(scale),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Healing,
-                        contentDescription = "Medical Logo",
-                        tint = Color.White,
-                        modifier = Modifier.size(52.dp)
-                    )
-                }
+                NeuroScreenEmblem(size = 96.dp)
             }
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            Text(
-                text = "NeuroScreen",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Parkinson's AI Motor Screening",
-                fontSize = 15.sp,
-                color = Color.White.copy(alpha = 0.85f)
-            )
+            NeuroScreenBranding()
 
             Spacer(modifier = Modifier.height(48.dp))
 
             CircularProgressIndicator(
                 modifier = Modifier.size(28.dp),
-                color = MedicalPrimaryLight,
+                color = Color.White.copy(alpha = 0.85f),
                 strokeWidth = 3.dp
             )
         }

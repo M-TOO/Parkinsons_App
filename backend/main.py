@@ -288,20 +288,18 @@ def get_patient_profile(
 
 @app.get("/admin/flagged", tags=["Admin Portal"])
 def list_flagged_sessions(
+    flagged_only: bool = False,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
-    """Priority triage queue: returns all flagged/atypical/monitor assessments requiring clinical review."""
-    flagged = (
-        db.query(AssessmentSession)
-        .filter(
+    """Returns assessments. When flagged_only=True, filters strictly to atypical/low stability scores."""
+    query = db.query(AssessmentSession)
+    if flagged_only:
+        query = query.filter(
             (AssessmentSession.risk_label.in_(["Review suggested", "Atypical pattern", "ATYPICAL", "MONITOR", "Inconclusive"])) |
-            (AssessmentSession.overall_stability_score < 80) |
-            (AssessmentSession.review_status == "Pending Review")
+            (AssessmentSession.overall_stability_score < 75)
         )
-        .order_by(AssessmentSession.created_at.desc())
-        .all()
-    )
+    sessions = query.order_by(AssessmentSession.created_at.desc()).all()
     return [{
         "session_id": s.session_id,
         "patient_id": s.user_id,
@@ -316,8 +314,8 @@ def list_flagged_sessions(
         "review_status": s.review_status,
         "clinical_notes": s.clinical_notes,
         "reviewed_by": s.reviewed_by,
-        "created_at": s.created_at
-    } for s in flagged]
+        "created_at": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else ""
+    } for s in sessions]
 
 
 @app.patch("/admin/sessions/{session_id}/review", response_model=SessionOut, tags=["Admin Portal"])

@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         // 4. Home Dashboard
-                        composable("home") {
+                         composable("home") {
                             HomeScreen(navController = navController)
                         }
 

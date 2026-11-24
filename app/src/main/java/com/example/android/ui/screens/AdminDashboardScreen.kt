@@ -1,6 +1,7 @@
 package com.example.android.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -66,42 +67,64 @@ fun AdminDashboardScreen(navController: NavController) {
         refreshData()
     }
 
+    // Intercept back button to perform proper sign out instead of leaking session
+    androidx.activity.compose.BackHandler {
+        com.example.android.data.api.ApiClient.clearToken()
+        navController.navigate("login") {
+            popUpTo(0) { inclusive = true }
+        }
+    }
+
+    var filterOnlyFlagged by remember { mutableStateOf(true) }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Clinician Portal", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MedicalSecondary.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = "NEUROLOGY",
-                                    color = MedicalSecondary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        com.example.android.ui.components.NeuroScreenEmblem(size = 36.dp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Clinician Portal", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MedicalSecondary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "NEUROLOGY",
+                                        color = MedicalSecondary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
+                            val doctorName = com.example.android.data.api.ApiClient.currentUser?.full_name ?: "Dr. Mercy Too (Neurologist)"
+                            Text(
+                                text = "Attending: $doctorName",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted
+                            )
                         }
-                        Text(
-                            text = "Attending: Dr. Mercy Too",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     IconButton(onClick = { refreshData() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = MedicalPrimary)
+                    }
+                    IconButton(onClick = {
+                        com.example.android.data.api.ApiClient.clearToken()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }) {
+                        Icon(
+                            Icons.Default.ExitToApp,
+                            contentDescription = "Sign Out",
+                            tint = StatusAtypical
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MedicalSurface)
@@ -224,47 +247,94 @@ fun AdminDashboardScreen(navController: NavController) {
                     }
                     selectedTab == 0 -> {
                         // ── Tab 0: Flagged Triage Queue ────────────────────
-                        if (flaggedSessions.isEmpty()) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = StatusSteady,
-                                    modifier = Modifier.size(56.dp)
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    "No Flagged Assessments",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    "All patient screenings are currently within stable motor thresholds.",
-                                    color = TextMuted,
-                                    fontSize = 13.sp
-                                )
+                        val flaggedCount = flaggedSessions.count {
+                            (it.overall_stability_score ?: 100.0) < 75.0 ||
+                            it.risk_label?.contains("Atypical", ignoreCase = true) == true ||
+                            it.risk_label?.contains("Review", ignoreCase = true) == true ||
+                            it.risk_label?.contains("Monitor", ignoreCase = true) == true
+                        }
+                        val displayedSessions = if (filterOnlyFlagged) {
+                            flaggedSessions.filter {
+                                (it.overall_stability_score ?: 100.0) < 75.0 ||
+                                it.risk_label?.contains("Atypical", ignoreCase = true) == true ||
+                                it.risk_label?.contains("Review", ignoreCase = true) == true ||
+                                it.risk_label?.contains("Monitor", ignoreCase = true) == true
                             }
                         } else {
-                            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                items(flaggedSessions) { session ->
-                                    FlaggedSessionCard(
-                                        session = session,
-                                        onReviewClick = {
-                                            reviewingSession = session
-                                            clinicalNotesText = session.clinical_notes ?: ""
-                                            selectedReviewStatus = session.review_status
+                            flaggedSessions
+                        }
+
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // Filter Controls
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = filterOnlyFlagged,
+                                    onClick = { filterOnlyFlagged = true },
+                                    label = { Text("Flagged Only ($flaggedCount)", fontSize = 12.sp) },
+                                    leadingIcon = {
+                                        if (filterOnlyFlagged) {
+                                            Icon(Icons.Default.FilterList, contentDescription = null, modifier = Modifier.size(14.dp))
                                         }
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = StatusAtypical.copy(alpha = 0.15f),
+                                        selectedLabelColor = StatusAtypical
                                     )
+                                )
+                                FilterChip(
+                                    selected = !filterOnlyFlagged,
+                                    onClick = { filterOnlyFlagged = false },
+                                    label = { Text("All Screenings (${flaggedSessions.size})", fontSize = 12.sp) }
+                                )
+                            }
+
+                            if (displayedSessions.isEmpty()) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = StatusSteady,
+                                        modifier = Modifier.size(56.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        "No Flagged Assessments",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Text(
+                                        if (filterOnlyFlagged) "No atypical screenings found. Switch to 'All Screenings' to view all tests." else "No tests recorded yet.",
+                                        color = TextMuted,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            } else {
+                                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    items(displayedSessions) { session ->
+                                        FlaggedSessionCard(
+                                            session = session,
+                                            onReviewClick = {
+                                                reviewingSession = session
+                                                clinicalNotesText = session.clinical_notes ?: ""
+                                                selectedReviewStatus = session.review_status
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                     selectedTab == 1 -> {
-                        // ── Tab 1: Patient Roster ──────────────────────────
+                        // ── Tab 1: Grouped Patient Roster (e.g. Alicia -> all her tests) ──
                         if (patients.isEmpty()) {
                             Column(
                                 modifier = Modifier.fillMaxSize(),
@@ -278,35 +348,14 @@ fun AdminDashboardScreen(navController: NavController) {
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items(patients) { patient ->
-                                    PatientRosterCard(
+                                    val patientTests = flaggedSessions.filter { it.patient_id == patient.id }
+                                    GroupedPatientRosterCard(
                                         patient = patient,
-                                        onReviewClick = {
-                                            val matchedSession = flaggedSessions.firstOrNull { it.patient_id == patient.id }
-                                            if (matchedSession != null) {
-                                                reviewingSession = matchedSession
-                                                clinicalNotesText = matchedSession.clinical_notes ?: ""
-                                                selectedReviewStatus = matchedSession.review_status
-                                            } else {
-                                                // Create reviewable target for latest patient screening
-                                                reviewingSession = FlaggedSession(
-                                                    session_id = "",
-                                                    patient_id = patient.id,
-                                                    patient_name = patient.full_name,
-                                                    patient_email = patient.email,
-                                                    patient_birth_year = patient.year_of_birth,
-                                                    overall_stability_score = patient.latest_score,
-                                                    risk_label = patient.latest_risk_label ?: "Screened",
-                                                    drawing_tremor_level = "Standard",
-                                                    drawing_status = "Complete",
-                                                    tapping_status = "Evaluated",
-                                                    review_status = "Pending Review",
-                                                    clinical_notes = null,
-                                                    reviewed_by = null,
-                                                    created_at = patient.latest_screening_date ?: ""
-                                                )
-                                                clinicalNotesText = ""
-                                                selectedReviewStatus = "Follow-up Required"
-                                            }
+                                        tests = patientTests,
+                                        onReviewTestClick = { selectedSession ->
+                                            reviewingSession = selectedSession
+                                            clinicalNotesText = selectedSession.clinical_notes ?: ""
+                                            selectedReviewStatus = selectedSession.review_status
                                         }
                                     )
                                 }
@@ -532,15 +581,20 @@ fun FlaggedSessionCard(
 }
 
 @Composable
-fun PatientRosterCard(
+fun GroupedPatientRosterCard(
     patient: PatientSummary,
-    onReviewClick: () -> Unit = {}
+    tests: List<FlaggedSession>,
+    onReviewTestClick: (FlaggedSession) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MedicalSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -548,50 +602,165 @@ fun PatientRosterCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(patient.full_name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(
-                        text = "${patient.email} • Born ${patient.year_of_birth}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextMuted
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Total Screenings: ${patient.total_assessments} • Last: ${patient.latest_screening_date ?: "No tests yet"}",
-                        fontSize = 12.sp,
-                        color = TextSecondary
-                    )
-                }
-
-                if (patient.latest_score != null) {
-                    Column(horizontalAlignment = Alignment.End) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Surface(
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MedicalPrimary.copy(alpha = 0.1f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = patient.full_name.take(1).uppercase(),
+                                fontWeight = FontWeight.Bold,
+                                color = MedicalPrimary,
+                                fontSize = 18.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(patient.full_name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(
-                            text = "${patient.latest_score.toInt()}/100",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = if (patient.latest_score >= 70) StatusSteady else StatusAtypical
+                            text = "${patient.email} • Born ${patient.year_of_birth}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
                         )
                         Text(
-                            text = patient.latest_risk_label ?: "STABLE",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextMuted
+                            text = "${tests.size} Recorded Screenings",
+                            fontSize = 11.sp,
+                            color = MedicalSecondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (patient.latest_score != null) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${patient.latest_score.toInt()}/100",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = if (patient.latest_score >= 75) StatusSteady else StatusAtypical
+                            )
+                            Text(
+                                text = patient.latest_risk_label ?: "STABLE",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (patient.latest_score >= 75) StatusSteady else StatusAtypical
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = { expanded = !expanded }) {
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (expanded) "Collapse" else "Expand",
+                            tint = MedicalPrimary
                         )
                     }
                 }
             }
 
-            if (patient.total_assessments > 0) {
+            // Expanded view: Shows all individual tests done by this patient!
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MedicalSurfaceVariant)
                 Spacer(modifier = Modifier.height(10.dp))
-                OutlinedButton(
-                    onClick = onReviewClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MedicalPrimary)
-                ) {
-                    Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Neurologist Notes & Review", fontSize = 13.sp)
+
+                Text(
+                    text = "Screening History for ${patient.full_name}:",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MedicalPrimary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (tests.isEmpty()) {
+                    Text(
+                        text = "No tests recorded yet for this patient.",
+                        fontSize = 12.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                } else {
+                    tests.forEachIndexed { index, test ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = MedicalSurfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Test #${tests.size - index} • ${test.created_at.take(16)}",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.sp
+                                    )
+                                    val score = test.overall_stability_score?.toInt() ?: 0
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (score >= 75) StatusSteady.copy(alpha = 0.15f) else StatusAtypical.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = "$score/100 (${test.risk_label ?: "Screened"})",
+                                            color = if (score >= 75) StatusSteady else StatusAtypical,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Spiral: ${test.drawing_status ?: "Complete"} • Wave: ${test.drawing_tremor_level ?: "Standard"} • Typing: ${test.tapping_status ?: "Recorded"}",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+
+                                if (!test.clinical_notes.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = androidx.compose.ui.graphics.Color(0xFFF0FDF4),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "Attending Note: \"${test.clinical_notes}\"",
+                                            fontSize = 11.sp,
+                                            color = TextPrimary,
+                                            modifier = Modifier.padding(6.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { onReviewTestClick(test) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(34.dp),
+                                    shape = RoundedCornerShape(6.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (test.clinical_notes.isNullOrBlank()) "Add Neurologist Notes" else "Edit Clinical Review",
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -298,58 +298,22 @@ fun ResultsScreen(
                 }
             }
 
-            // 9. Download / Share Clinical Report Button
+            // 9. Download / Share Clinical PDF Report Button
             item {
-                OutlinedButton(
+                Button(
                     onClick = {
-                        val reportText = buildString {
-                            appendLine("==================================================")
-                            appendLine("   NEUROSCREEN - DIGITAL MOTOR BIOMARKER REPORT   ")
-                            appendLine("==================================================")
-                            if (result.screeningDate.isNotBlank()) {
-                                appendLine("Screening Date: ${result.screeningDate}")
-                            }
-                            if (result.sessionId.isNotBlank()) {
-                                appendLine("Session ID: ${result.sessionId}")
-                            }
-                            appendLine("Overall Stability Score: ${result.overallScore} / 100")
-                            appendLine("Clinical Risk Classification: ${result.riskLabel.uppercase()}")
-                            appendLine()
-                            appendLine("MODALITY BREAKDOWN:")
-                            appendLine("• Spiral Drawing: ${result.spiralStatus} (${result.spiralTremorLevel})")
-                            appendLine("• Wave Drawing:   ${result.waveStatus} (${result.waveTremorLevel})")
-                            appendLine("• Typing Rhythm:  ${result.tappingStatus} (${result.tappingStabilityMatch}% stability)")
-                            appendLine()
-                            if (!result.clinicalNotes.isNullOrBlank()) {
-                                appendLine("NEUROLOGIST CLINICAL REVIEW:")
-                                if (!result.reviewedBy.isNullOrBlank()) {
-                                    appendLine("Attending: ${result.reviewedBy}")
-                                }
-                                appendLine("Clinical Notes: \"${result.clinicalNotes}\"")
-                                appendLine()
-                            }
-                            appendLine("DISCLAIMER:")
-                            appendLine("This digital biomarker screening is an adjunctive clinical evaluation tool and does not constitute a standalone medical diagnosis.")
-                            appendLine("==================================================")
-                        }
-
-                        val sendIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TITLE, "NeuroScreen Clinical Motor Report")
-                            putExtra(Intent.EXTRA_SUBJECT, "NeuroScreen Motor Assessment Report")
-                            putExtra(Intent.EXTRA_TEXT, reportText)
-                            type = "text/plain"
-                        }
-                        context.startActivity(Intent.createChooser(sendIntent, "Download / Share Clinical Report"))
+                        val patientName = com.example.android.data.api.ApiClient.currentUser?.full_name ?: "NeuroScreen Patient"
+                        com.example.android.util.PdfReportGenerator.generateAndShareReport(context, result, patientName)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary)
                 ) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = MedicalPrimary)
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Download & Share Clinical Report", fontWeight = FontWeight.Bold, color = MedicalPrimary)
+                    Text("Download & Share Clinical PDF Report", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
 
